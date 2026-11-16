@@ -141,6 +141,27 @@ form.add input[type="checkbox"]{width:24px;height:24px;padding:0;border:0;accent
 .week b.full{background:var(--ok);color:var(--surface)}
 .week .cur{box-shadow:inset 0 0 0 2px var(--ink)}
 .ev{flex-wrap:wrap}
+.chat{gap:14px}
+.msgs{display:flex;flex-direction:column;gap:12px;height:min(52vh,520px);overflow-y:auto;padding:4px 2px;overscroll-behavior:contain}
+.msg{display:flex;gap:8px;align-items:flex-end;max-width:88%}
+.msg.mine{align-self:flex-end;flex-direction:row-reverse}
+.mb{display:flex;flex-direction:column;gap:3px;min-width:0}
+.msg.mine .mb{align-items:flex-end}
+.bub{background:var(--bg);border-radius:18px 18px 18px 6px;padding:10px 14px;text-align:left;font-size:17px;line-height:1.45;overflow-wrap:anywhere;white-space:pre-wrap}
+.msg.mine .bub{background:var(--accent);color:var(--on-accent);border-radius:18px 18px 6px 18px;cursor:default}
+.bub.quick{font-family:var(--display);font-size:21px}
+.bub[disabled]{opacity:1}
+.quote{display:block;font-size:12px;opacity:.8;border-left:3px solid currentColor;padding-left:7px;margin-bottom:5px;font-family:var(--body)}
+.dayline{align-self:center;font-size:12px;color:var(--muted);background:var(--bg);border-radius:999px;padding:2px 12px}
+.quickrow{display:flex;flex-wrap:wrap;gap:8px}
+.qbtn{background:var(--sunk);border-radius:999px;padding:8px 14px;font-family:var(--display);font-size:17px}
+.quickrow.big .qbtn{font-size:22px;padding:12px 18px}
+.sendrow{display:flex;gap:8px}
+.sendrow input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--line);border-radius:999px;padding:10px 16px}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:12px;font-family:var(--body);font-weight:700;margin-left:4px;vertical-align:2px}
+.tab[aria-selected="true"] .badge{background:var(--on-accent);color:var(--accent)}
+.mini{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:14px;padding:8px 12px;min-width:0}
+.mini span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .soon{border:3px dashed var(--line);background:transparent;text-align:center;padding:36px 20px}
 
 .faces{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
@@ -155,6 +176,8 @@ form.add input[type="checkbox"]{width:24px;height:24px;padding:0;border:0;accent
 .kv dt{color:var(--muted);font-size:14px}.kv dd{margin:0;overflow-wrap:anywhere}
 table.rec{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 table.rec td{padding:6px 4px;border-top:1px solid var(--line)}
+.topdate{white-space:nowrap}
+@media (max-width:560px){.topdate{visibility:hidden;width:0}}
 @media (max-width:480px){.top h1{font-size:24px}.who h1{font-size:34px}.tab{font-size:14px}.card{padding:16px}.clock{font-size:26px}}
 </style>
 </head><body>
@@ -164,7 +187,7 @@ table.rec td{padding:6px 4px;border-top:1px solid var(--line)}
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,onSnapshot,setDoc,updateDoc,deleteField,increment,arrayUnion} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,onSnapshot,setDoc,updateDoc,deleteField,increment,arrayUnion,collection as fsCollection,query as fsQuery,orderBy as fsOrderBy,limit as fsLimit,addDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 (function(){
 const M=[
  {id:'mom',name:'엄마',role:'parent'},{id:'dad',name:'아빠',role:'parent'},
@@ -186,10 +209,12 @@ const FB={apiKey:"AIzaSyBpNH_wEiAnVCAvLsPLM_oTXHRAQcWWJ-U",authDomain:"hafamily-
 const fbApp=initializeApp(FB),auth=getAuth(fbApp);
 let fdb;try{fdb=initializeFirestore(fbApp,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){fdb=initializeFirestore(fbApp,{})}
 const REF=doc(fdb,'families','main');
+const MSGS=fsCollection(fdb,'families','main','messages');
+let MSG=[];
 const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},events:[],meds:[],taken:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{}});
+const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},events:[],meds:[],taken:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{}});
 function fromDoc(d){const o=EMPTY();
- for(const k of['faces','stars','done','taken','info','pins'])Object.assign(o[k],d[k]||{});
+ for(const k of['faces','stars','done','taken','info','pins','reads'])Object.assign(o[k],d[k]||{});
  for(const k of['tasks','events','meds','growth'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id}));
  for(const m of['mom','dad','eun','yeon'])o.info[m]=o.info[m]||{};return o}
 function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily:true,from:today}};
@@ -199,7 +224,7 @@ function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily
 let S=EMPTY(),ready=false,syncErr='';
 function upd(o){if(!ready)return;updateDoc(REF,o).catch(err=>{syncErr='저장하지 못했어요 ('+(err.code||err.message)+'). 인터넷 연결을 확인해 주세요.';render()})}
 
-const ui={view:'loading',pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
+const ui={view:'loading',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
 const isTablet=()=>ui.me==='tablet';
 const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||ui.me==='eun';
@@ -325,6 +350,7 @@ function homeView(){
   <div class="card stack"><div class="row"><h3 class="grow">다가오는 일정</h3><button class="btn ghost sm" data-act="tab" data-t="cal">달력 보기</button></div>${upList(3)}</div>
   <div class="card stack"><div class="row"><h3 class="grow">오늘 내 약·영양제</h3><button class="btn ghost sm" data-act="tab" data-t="health">건강 보기</button></div>
    ${mine.map(m=>medRow(m)).join('')||'<p class="muted">등록된 약·영양제가 없어요.</p>'}</div>
+  ${msgCard()}
  </div>`}
 
 /* ---------- 홈 (공용 태블릿 대시보드) ---------- */
@@ -497,12 +523,50 @@ function healthView(){
       <dt>성별</dt><dd>${SEX[info.sex]||'<span class="muted">아직 안 적었어요</span>'}</dd>${F.map(([k,n])=>`<dt>${n}</dt><dd>${info[k]?esc(info[k]):'<span class="muted">아직 안 적었어요</span>'}</dd>`).join('')}</dl>`}
   </div></div>`}
 
-function chatView(){return `<div class="card soon stack"><h2 style="font-size:26px">가족 메신저는 2단계예요</h2>
- <p class="muted">다음 단계에서 만들어요. 가족방, 아이용 버튼 답장, 새 메시지 알림이 들어갈 자리예요.</p></div>`}
+/* ---------- 가족 메신저 ---------- */
+const QUICK_KID=['사랑해요 😍','안녕히 주무세요 🌙','보고 싶어요 🥺','배고파요 🍚','다 했어요! ✅','언제 와요? 🚗'];
+const QUICK_PARENT=['사랑해 ❤️','알았어 👍','곧 갈게 🚗','잘했어 👏','전화할게 📞','밥 먹자 🍚'];
+const sender=()=>isTablet()?ui.tsend:ui.me;
+const canType=()=>sender()!=='yeon';
+const nameOf=id=>by(id)?by(id).name:'';
+const readKey=()=>ui.me;
+const unread=()=>{if(!ui.me)return 0;const r=S.reads[readKey()]||0,me=sender();return MSG.filter(m=>m.ts>r&&m.from!==me).length};
+function hm(ts){const d=new Date(ts),h=d.getHours();return(h<12?'오전 ':'오후 ')+((h%12)||12)+':'+pad(d.getMinutes())}
+function chatView(){
+ const me=sender();let lastDay='';
+ const bubbles=MSG.map(m=>{const mine=m.from===me,rep=m.reply&&MSG.find(x=>x.id===m.reply),dd=ds(new Date(m.ts));
+  const line=dd!==lastDay?`<span class="dayline">${dd===today?'오늘':nice(dd)+'요일'}</span>`:'';lastDay=dd;
+  return line+`<div class="msg ${mine?'mine':''}">${mine?'':av(m.from,'sm')}<div class="mb">
+   ${mine?'':`<span class="small muted">${nameOf(m.from)}</span>`}
+   <button class="bub ${m.quick?'quick':''}" data-act="replyto" data-id="${m.id}" ${mine?'disabled':''} aria-label="${mine?'내 메시지':nameOf(m.from)+' 메시지에 답장'}">${rep?`<span class="quote">${nameOf(rep.from)}: ${esc(rep.text.slice(0,40))}</span>`:''}${esc(m.text)}</button>
+   <span class="small muted">${hm(m.ts)}</span></div></div>`}).join('');
+ const target=ui.replyTo&&MSG.find(x=>x.id===ui.replyTo);
+ const quick=by(me).role==='parent'?QUICK_PARENT:QUICK_KID;
+ return `<div class="card stack chat">
+  <div class="row"><h3 class="grow">우리가족 방</h3><span class="muted">${M.map(m=>S.faces[m.id]).join(' ')}</span></div>
+  <div class="msgs" id="msgs">${bubbles||'<p class="muted" style="text-align:center;margin:auto">아직 메시지가 없어요. 첫 인사를 보내 보세요!</p>'}</div>
+  ${isTablet()?`<div class="row"><span class="small muted">보내는 사람</span>${['eun','yeon'].map(i=>`<button class="pill ${ui.tsend===i?'on':''}" data-act="tsend" data-id="${i}">${av(i,'sm')}${by(i).name}</button>`).join('')}</div>`:''}
+  ${target?`<div class="row notice"><span class="grow">${nameOf(target.from)}의 "${esc(target.text.slice(0,30))}"에 답장</span><button class="x" data-act="replyx" aria-label="답장 취소">✕</button></div>`:''}
+  <div class="quickrow ${me==='yeon'?'big':''}">${quick.map(q=>`<button class="qbtn" data-act="quick" data-t="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+  ${canType()?`<form class="sendrow" data-form="msg"><input id="msg-text" name="t" placeholder="직접 써서 보내기" maxlength="300" autocomplete="off" enterkeyhint="send"><button class="btn">보내기</button></form>`:''}
+  <p class="small muted">${by(me).role==='parent'?'아이 메시지를 누르면 그 메시지에 답장할 수 있어요.':'다른 사람 메시지를 누르면 답장할 수 있어요.'}</p>
+ </div>`}
+function sendMsg(text,quick){const from=sender();text=(text||'').trim();if(!ready||!text||!from)return;
+ const m={from,text,quick:!!quick,ts:serverTimestamp()};if(ui.replyTo)m.reply=ui.replyTo;ui.replyTo=null;ui.scrollEnd=true;
+ addDoc(MSGS,m).catch(err=>{syncErr='메시지를 보내지 못했어요 ('+(err.code||err.message)+')';render()})}
+function msgCard(){const last=MSG.slice(-3),n=unread();
+ return `<div class="card stack"><div class="row"><h3 class="grow">가족방${n?`<span class="badge">${n}</span>`:''}</h3><button class="btn ghost sm" data-act="tab" data-t="chat">열기</button></div>
+  ${last.map(m=>`<div class="mini">${av(m.from,'sm')}<span class="t">${esc(m.text)}</span><span class="small muted">${hm(m.ts)}</span></div>`).join('')||'<p class="muted">아직 메시지가 없어요.</p>'}</div>`}
+let actx=null;
+function ding(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const t=actx.currentTime;
+ [880,1175].forEach((f,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.setValueAtTime(.0001,t+i*.12);
+  g.gain.exponentialRampToValueAtTime(.18,t+i*.12+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.12+.3);o.connect(g);g.connect(actx.destination);o.start(t+i*.12);o.stop(t+i*.12+.32)});
+ if(navigator.vibrate)navigator.vibrate(120)}catch(e){}}
 
-function mainView(){const tabs=[['home',isTablet()?'대시보드':'홈'],['cal','일정'],['todo','할 일'],['health','건강'],['chat','메신저']];
+function mainView(){const tabs=[['home',isTablet()?'대시보드':'홈'],['cal','일정'],['todo','할 일'],['health','건강'],['chat','메신저'+(unread()&&ui.tab!=='chat'?`<span class="badge">${unread()}</span>`:'')]];
  const name=isTablet()?'공용 태블릿':by(ui.me).name;
- return `<div class="row top"><h1>우리가족</h1><span class="muted grow">${nice(today)}요일</span>
+ return `<div class="row top"><h1>우리가족</h1><span class="muted grow topdate">${nice(today)}요일</span>
+  ${isTablet()&&unread()&&ui.tab!=='chat'?`<button class="chip admin" data-act="tab" data-t="chat" style="font-size:16px;padding:8px 16px">💌 새 메시지 ${unread()}</button>`:''}
   ${isTablet()?`<span class="clock" id="clock">${clockText()}</span>`:''}
   ${isParent()?'<span class="chip admin">관리모드</span>':''}
   <button class="me" data-act="switch" aria-label="사용자 바꾸기">${av(ui.me,'sm')}<b>${name}</b><span class="small muted">바꾸기</span></button></div>
@@ -515,7 +579,7 @@ const app=document.getElementById('app');
 /* 다른 기기에서 바뀐 내용으로 다시 그릴 때, 입력 중이던 칸은 그대로 둠 */
 const dirty=el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.tagName==='SELECT'?[...el.options].some(o=>o.selected!==o.defaultSelected):el.value!==el.defaultValue;
 function render(keep){
- let vals=null,foc=null;
+ let vals=null,foc=null;const mb=document.getElementById('msgs'),atEnd=!mb||mb.scrollHeight-mb.scrollTop-mb.clientHeight<60,oldTop=mb?mb.scrollTop:0;
  if(keep){vals={};app.querySelectorAll('input[id],select[id]').forEach(el=>{if(dirty(el))vals[el.id]=el.type==='checkbox'?el.checked:el.value});
   const a=document.activeElement;if(a&&a.id&&app.contains(a))foc=a.id}
  app.className='wrap'+(ui.view==='main'&&isTablet()?' wide':'');
@@ -523,6 +587,10 @@ function render(keep){
  app.innerHTML=ui.view==='loading'?loadingView():ui.view==='login'?loginView():ui.view==='who'?whoView():ui.view==='pin'?pinView():mainView();
  if(vals){for(const id in vals){const el=document.getElementById(id);if(el){if(el.type==='checkbox')el.checked=vals[id];else el.value=vals[id]}}
   if(foc){const el=document.getElementById(foc);if(el)el.focus()}}
+ const mb2=document.getElementById('msgs');if(mb2){mb2.scrollTop=ui.scrollEnd||atEnd||!mb?mb2.scrollHeight:oldTop;ui.scrollEnd=false}
+ markRead()}
+function markRead(){if(!ready||ui.view!=='main'||ui.tab!=='chat'||!MSG.length)return;const lt=MSG[MSG.length-1].ts,k=readKey();
+ if(lt>(S.reads[k]||0)){S.reads[k]=lt;upd({['reads.'+k]:lt})}
 }
 /* 아이·공용 태블릿은 이 기기에서 기억, 엄마·아빠는 매번 비밀번호 */
 const ME_KEY='hafamily-me';
@@ -545,10 +613,14 @@ app.addEventListener('click',e=>{
  else if(a==='key'){if(ui.pin.length>=4)return;ui.pin+=b.dataset.k;if(ui.pin.length===4)checkPin()}
  else if(a==='del'){ui.pin=ui.pin.slice(0,-1)}
  else if(a==='back'){if(ui.pinNew&&ui.me){ui.pinNew=false;ui.view='main'}else{ui.view='who';ui.me=null}}
- else if(a==='switch'){ui.view='who';ui.me=null;remember(null)}
+ else if(a==='switch'){ui.view='who';ui.me=null;ui.replyTo=null;remember(null)}
  else if(a==='logout'){remember(null);signOut(auth)}
  else if(a==='pinreset'&&isParent()){ui.pend=ui.me;ui.pin='';ui.pinMsg='';ui.pinNew=true;ui.view='pin'}
- else if(a==='tab'){ui.tab=b.dataset.t}
+ else if(a==='tab'){ui.tab=b.dataset.t;if(ui.tab==='chat')ui.scrollEnd=true}
+ else if(a==='quick'){sendMsg(b.dataset.t,true)}
+ else if(a==='replyto'){const m=MSG.find(x=>x.id===id);if(m&&m.from!==sender())ui.replyTo=id}
+ else if(a==='replyx'){ui.replyTo=null}
+ else if(a==='tsend'&&isTablet()){ui.tsend=id;ui.replyTo=null}
  else if(a==='toggle'){const t=S.tasks.find(x=>x.id===id),d=b.dataset.d||today;if(t&&canDo(t.who,d)){const on=!isDone(t,d),o={['done.'+d+'.'+t.id]:on?true:deleteField()};
    if(t.who in S.stars){if(on)o['stars.'+t.who]=increment(1);else if(S.stars[t.who]>0)o['stars.'+t.who]=increment(-1)}upd(o)}}
  else if(a==='med'){const m=S.meds.find(x=>x.id===id);if(m&&canCheck(m.who))upd({['taken.'+m.id]:taken(m)?deleteField():today})}
@@ -577,6 +649,7 @@ app.addEventListener('submit',e=>{
    ui.loginErr=/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?'이메일이나 비밀번호가 맞지 않아요.':
     /too-many-requests/.test(c)?'여러 번 틀려서 잠시 막혔어요. 조금 뒤에 다시 해 주세요.':/network/.test(c)?'인터넷 연결을 확인해 주세요.':'로그인하지 못했어요 ('+c+')';render()});
   return}
+ if(k==='msg'){const t=f.elements.t.value;if(t.trim()){sendMsg(t,false);f.elements.t.value=''}render();const el=document.getElementById('msg-text');if(el)el.focus();return}
  const jump=date=>{ui.sel=date;const d=new Date(date+'T00:00');ui.ym=[d.getFullYear(),d.getMonth()]};
  if(k==='event'){if(!canEv()||!v('t')||!v('date'))return;const date=v('date'),end=v('end');
   const ev={date,time:v('time'),t:v('t'),who:v('who')};if(end>date)ev.end=end;
@@ -602,9 +675,11 @@ app.addEventListener('submit',e=>{
 setInterval(()=>{const c=document.getElementById('clock');if(c)c.textContent=clockText()},20000);
 /* 밤 12시가 지나면 새 날로 다시 열기 (켜 둔 공용 태블릿용) */
 setInterval(()=>{if(ds(new Date())!==today)location.reload()},60000);
-let unsub=null;
+let unsub=null,unsubM=null,knownMsg=null;
 onAuthStateChanged(auth,user=>{
  if(unsub){unsub();unsub=null}
+ if(unsubM){unsubM();unsubM=null}
+ MSG=[];knownMsg=null;
  ready=false;syncErr='';
  if(!user){ui.view='login';ui.me=null;render();return}
  ui.view='loading';render();
@@ -614,6 +689,13 @@ onAuthStateChanged(auth,user=>{
   if(!ready){ready=true;const r=remembered();if(r)enter(r);else ui.view='who';render();return}
   render(true)},
  err=>{syncErr=err.code==='permission-denied'?'이 계정으로는 가족 데이터를 볼 수 없어요. Firestore 보안 규칙에 적은 이메일과 로그인한 이메일이 같은지 확인해 주세요.':'연결하지 못했어요 ('+err.code+')';render()});
+ unsubM=onSnapshot(fsQuery(MSGS,fsOrderBy('ts','desc'),fsLimit(100)),snap=>{
+  MSG=snap.docs.map(d=>{const x=d.data({serverTimestamps:'estimate'})||{};const t=x.ts&&x.ts.toMillis?x.ts.toMillis():Date.now();
+   return{id:d.id,from:x.from,text:String(x.text||''),quick:!!x.quick,reply:x.reply||null,ts:t}}).filter(m=>by(m.from)).reverse();
+  const ids=new Set(MSG.map(m=>m.id));
+  if(knownMsg&&ui.view==='main'&&MSG.some(m=>!knownMsg.has(m.id)&&m.from!==sender()))ding();
+  knownMsg=ids;render(true)},
+ err=>{if(err.code==='permission-denied')syncErr='메시지를 볼 수 없어요. Firestore 보안 규칙을 새 규칙으로 바꿔 주세요.';else syncErr='메시지를 불러오지 못했어요 ('+err.code+')';render()});
 });
 render();
 })();
