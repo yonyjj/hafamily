@@ -162,6 +162,14 @@ form.add input[type="checkbox"]{width:24px;height:24px;padding:0;border:0;accent
 .tab[aria-selected="true"] .badge{background:var(--on-accent);color:var(--accent)}
 .mini{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:14px;padding:8px 12px;min-width:0}
 .mini span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
+form.add .chips label{flex-direction:row;align-items:center;gap:6px;background:var(--bg);border:2px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink);font-size:15px;cursor:pointer;position:relative}
+form.add .chips label:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+form.add .chips label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+form.add .chips input[type="checkbox"]{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.chips-t{flex-basis:100%;font-size:13px;color:var(--muted)}
+.avs{display:flex;flex:none}.avs .av+.av{margin-left:-10px}
+.medsub{font-size:13px;color:var(--muted);margin:4px 0 -4px}
 .soon{border:3px dashed var(--line);background:transparent;text-align:center;padding:36px 20px}
 
 .faces{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
@@ -216,9 +224,9 @@ const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}};
 const DEV=lsGet('hafamily-dev')||(()=>{const d=newId('d');lsSet('hafamily-dev',d);return d})();
 const START_CHAT=location.hash==='#chat';
-const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},events:[],meds:[],taken:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{}});
+const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},events:[],meds:[],taken:{},took:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{}});
 function fromDoc(d){const o=EMPTY();
- for(const k of['faces','stars','done','taken','info','pins','reads'])Object.assign(o[k],d[k]||{});
+ for(const k of['faces','stars','done','taken','took','info','pins','reads'])Object.assign(o[k],d[k]||{});
  for(const k of['tasks','events','meds','growth'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id}));
  for(const m of['mom','dad','eun','yeon'])o.info[m]=o.info[m]||{};return o}
 function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily:true,from:today}};
@@ -235,14 +243,19 @@ const canEv=()=>isParent()||ui.me==='eun';
 const canCheck=who=>isParent()||isTablet()||who===ui.me;
 const canDo=(who,d)=>canCheck(who)&&(isParent()?d<=today:d===today);
 const av=(id,c='')=>id==='all'?`<span class="av all ${c}">🏠</span>`:id==='tablet'?`<span class="av tablet ${c}">📺</span>`:`<span class="av ${id} ${c}">${S.faces[id]}</span>`;
-const whoName=id=>id==='all'?'가족 모두':by(id).name;
+const whoArr=w=>w==='all'?['all']:Array.isArray(w)?w:[w];
+const whoName=w=>whoArr(w).map(x=>x==='all'?'가족 모두':by(x)?by(x).name:'').join('·');
+const avs=w=>{const a=whoArr(w);return a.length>1?`<span class="avs">${a.map(i=>av(i,'sm')).join('')}</span>`:av(a[0])};
 function dday(date){
  const n=Math.round((new Date(date+'T00:00')-new Date(today+'T00:00'))/864e5);
  return n===0?'오늘':n===1?'내일':n===2?'모레':n>0?n+'일 뒤':Math.abs(n)+'일 전';
 }
 function nice(date){const d=new Date(date+'T00:00');return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+WD[d.getDay()]}
 const isWk=d=>{const w=new Date(d+'T00:00').getDay();return w>0&&w<6};
-const tasksOn=(who,d)=>S.tasks.filter(t=>t.who===who&&(t.daily?t.from<=d&&(!t.stop||d<t.stop)&&(!t.wk||isWk(d)):t.date===d));
+const dow=d=>new Date(d+'T00:00').getDay();
+const tasksOn=(who,d)=>S.tasks.filter(t=>t.who===who&&(t.daily?t.from<=d&&(!t.stop||d<t.stop)&&(!t.wk||isWk(d))&&(!t.days||t.days.includes(dow(d))):t.date===d));
+const WD_ORDER=[1,2,3,4,5,6,0];
+const repLabel=t=>t.days?'매주 '+WD_ORDER.filter(i=>t.days.includes(i)).map(i=>WD[i]).join('·'):t.wk?'평일':'매일';
 const isDone=(t,d)=>!!(S.done[d]&&S.done[d][t.id]);
 const prog=(id,d=today)=>{const l=tasksOn(id,d);return[l.filter(t=>isDone(t,d)).length,l.length]};
 const recs=id=>S.growth.filter(g=>g.who===id).sort((a,b)=>a.date<b.date?-1:1);
@@ -308,25 +321,35 @@ function nextOcc(e){if(e.rep){const t0=dn(today),last=dn(e.until||e.date)+evLen(
 function evRow(o,del){const e=o.e,multi=o.end>o.date,nights=multi?Math.round((new Date(o.end+'T00:00')-new Date(o.date+'T00:00'))/864e5):0;
  const when=multi?`${nice(o.date)} ~ ${nice(o.end)} · ${nights}박 ${nights+1}일`:nice(o.date)+(e.time?' · '+esc(e.time):'');
  const chip=o.date<today&&o.end>=today?'진행 중':dday(o.date);
- return `<div class="ev">${av(e.who)}
+ return `<div class="ev">${avs(e.who)}
  <div class="grow"><div class="t">${esc(e.t)}</div><div class="small muted">${when} · ${whoName(e.who)}${e.yearly?` · 매년 ${e.yearly==='lunar'?'음력':'양력'} ${e.md[0]}월 ${e.md[1]}일`:''}${e.rep?` · ${e.rep==='week'?'매주':'매달'} 반복 (${nice(e.until)}까지)`:''}</div></div>
  <span class="chip">${chip}</span>${!del?'':e.rep?`<button class="btn ghost sm" data-act="skipev" data-id="${e.id}" data-d="${o.date}">이 날만 빼기</button><button class="btn ghost sm" data-act="delev" data-id="${e.id}">전체 삭제</button>`
   :`<button class="x" data-act="delev" data-id="${e.id}" aria-label="일정 지우기">✕</button>`}</div>`}
 const upcoming=()=>S.events.map(nextOcc).filter(Boolean).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
 const upList=n=>upcoming().slice(0,n).map(o=>evRow(o)).join('')||'<p class="muted">다가오는 일정이 없어요.</p>';
 
-function medRow(m,showWho){const on=taken(m),can=canCheck(m.who);return `<div class="taskrow">
- <button class="task ${on?'done':''}" data-act="med" data-id="${m.id}" ${can?'':'disabled'} aria-pressed="${on}">
+const TIMES=['아침','점심','저녁','자기 전'];
+/* 그날 먹을 것: 영양제는 매일, 약은 기간 안에서 정한 시간마다 */
+function doses(who,d){const out=[];
+ S.meds.filter(m=>m.who===who).forEach(m=>{
+  if(m.kind==='med'){if(m.from<=d&&d<=m.to)(m.times||[]).forEach(tm=>out.push({m,key:m.id+'_'+TIMES.indexOf(tm),when:tm}))}
+  else out.push({m,key:m.id,when:m.when||''})});
+ return out.sort((a,b)=>TIMES.indexOf(a.when)-TIMES.indexOf(b.when))}
+const tookOn=(k,d=today)=>!!(S.took[d]&&S.took[d][k]);
+function medRow(z,showWho,del){const m=z.m,on=tookOn(z.key),can=canCheck(m.who);
+ const sub=(showWho?by(m.who).name+' · ':'')+esc(z.when)+(m.kind==='med'?` · 약 ${dn(today)-dn(m.from)+1}/${dn(m.to)-dn(m.from)+1}일째`:' · 영양제');
+ return `<div class="taskrow">
+ <button class="task ${on?'done':''}" data-act="med" data-id="${m.id}" data-k="${z.key}" ${can?'':'disabled'} aria-pressed="${on}">
   <span class="box">✓</span>${showWho?av(m.who,'sm'):''}<span class="grow"><span class="t">${esc(m.t)}</span>
-  <span class="small muted" style="display:block">${showWho?by(m.who).name+' · ':''}${esc(m.when)}</span></span></button>
- ${isParent()?`<button class="x" data-act="delmed" data-id="${m.id}" aria-label="약 지우기">✕</button>`:''}</div>`}
+  <span class="small muted" style="display:block">${sub}</span></span></button>
+ ${del&&isParent()?`<button class="x" data-act="delmed" data-id="${m.id}" aria-label="${m.kind==='med'?'약':'영양제'} 지우기">✕</button>`:''}</div>`}
 
 function calGrid(){
  const[y,mo]=ui.ym,first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate();
  let cells='';for(let i=0;i<first;i++)cells+='<span></span>';
  for(let d=1;d<=days;d++){const k=y+'-'+pad(mo+1)+'-'+pad(d),ev=S.events.filter(e=>covers(e,k));
   cells+=`<button class="day ${k===today?'today':''} ${k===ui.sel?'sel':''}" data-act="day" data-d="${k}" aria-label="${mo+1}월 ${d}일, 일정 ${ev.length}개">
-   ${d}<span class="pips">${ev.slice(0,3).map(e=>`<i class="${e.who}"></i>`).join('')}</span></button>`}
+   ${d}<span class="pips">${ev.flatMap(e=>whoArr(e.who)).slice(0,3).map(w=>`<i class="${w}"></i>`).join('')}</span></button>`}
  return `<div class="row"><button class="btn ghost sm" data-act="mon" data-n="-1" aria-label="이전 달">‹</button>
    <h3 class="grow" style="text-align:center">${y}년 ${mo+1}월</h3>
    <button class="btn ghost sm" data-act="mon" data-n="1" aria-label="다음 달">›</button></div>
@@ -339,7 +362,7 @@ function facePicker(){if(!ui.pick)return'';const ids=isParent()?M.map(m=>m.id):[
 
 /* ---------- 홈 (개인) ---------- */
 function homeView(){
- const me=by(ui.me),[d,n]=prog(ui.me),left=n-d,mine=S.meds.filter(m=>m.who===ui.me);
+ const me=by(ui.me),[d,n]=prog(ui.me),left=n-d,mine=doses(ui.me,today);
  const hello=isParent()?`${me.name}, 오늘 우리 가족은 이래요`:(left?`${me.name}, 오늘 할 일 ${left}개 남았어!`:`${me.name}, 오늘 할 일 다 했어! 최고!`);
  return `<div class="card row">${av(me.id,'lg')}<div class="grow stack" style="gap:6px">
    <h2 style="font-size:28px">${hello}</h2><p class="muted">${nice(today)}요일</p></div>
@@ -353,7 +376,7 @@ function homeView(){
  <div class="grid">
   <div class="card stack"><div class="row"><h3 class="grow">다가오는 일정</h3><button class="btn ghost sm" data-act="tab" data-t="cal">달력 보기</button></div>${upList(3)}</div>
   <div class="card stack"><div class="row"><h3 class="grow">오늘 내 약·영양제</h3><button class="btn ghost sm" data-act="tab" data-t="health">건강 보기</button></div>
-   ${mine.map(m=>medRow(m)).join('')||'<p class="muted">등록된 약·영양제가 없어요.</p>'}</div>
+   ${mine.map(z=>medRow(z)).join('')||'<p class="muted">오늘 먹을 약·영양제가 없어요.</p>'}</div>
   ${msgCard()}
  </div>`}
 
@@ -371,7 +394,7 @@ function dashView(){
      <span class="box">✓</span>${av(t.who,'sm')}<span class="t">${esc(t.t)}</span></button>`).join('')||'<p class="muted">아이들 할 일을 다 했어요!</p>'}
    <div class="row small muted">${M.filter(m=>m.role==='parent').map(m=>{const[a,b]=prog(m.id);return `<span class="chip">${S.faces[m.id]} ${m.name} ${a}/${b}</span>`}).join('')}</div></div>
   <div class="card s6 c3 stack"><div class="row"><h3 class="grow">오늘 약·영양제</h3><button class="btn ghost sm" data-act="tab" data-t="health">건강 보기</button></div>
-   ${S.meds.map(m=>medRow(m,true)).join('')||'<p class="muted">등록된 약·영양제가 없어요.</p>'}</div>
+   ${M.flatMap(x=>doses(x.id,today)).map(z=>medRow(z,true)).join('')||'<p class="muted">오늘 먹을 약·영양제가 없어요.</p>'}</div>
   <div class="card s6 c4a stack"><h3>다가오는 일정</h3>${upList(3)}</div>
   <div class="card s6 c4b stack">${calGrid()}</div>
  </div>`}
@@ -389,22 +412,25 @@ function todoView(){
  ${isParent()?`<div class="card stack"><h3>할 일 추가</h3>
    <form class="add" data-form="task"><input id="task-title" name="t" placeholder="예: 피아노 연습" required maxlength="30">
    <select id="task-who" name="who" aria-label="누가">${M.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select>
-   <select id="task-rep" name="rep" aria-label="반복"><option value="daily">매일</option><option value="wk">평일만 (월~금)</option><option value="once">하루만</option></select>
+   <select id="task-rep" name="rep" aria-label="반복"><option value="daily">매일</option><option value="wk">평일만 (월~금)</option><option value="days">매주 (요일 고르기)</option><option value="once">하루만</option></select>
+   <div class="chips" id="task-days" hidden><span class="chips-t">반복할 요일</span>${WD_ORDER.map(i=>`<label><input type="checkbox" id="td-${i}" name="tdays" value="${i}"${i===dow(ui.td)?' checked':''}>${WD[i]}</label>`).join('')}</div>
    <button class="btn">추가</button></form>
-   <p class="small muted">매일·평일 항목은 한 번 넣으면 자동으로 계속 나와요. '하루만'은 보고 있는 날에만 추가돼요. 매일·평일 항목을 ✕로 지우면 보고 있는 날부터 빠지고, 지난 기록은 남아요.</p></div>`
+   <p class="small muted">매일·평일·매주 항목은 한 번 넣으면 자동으로 계속 나와요. '하루만'은 보고 있는 날에만 추가돼요. 반복 항목을 ✕로 지우면 보고 있는 날부터 빠지고, 지난 기록은 남아요.</p></div>`
   :isTablet()?'':`<p class="notice">${isToday?'내 할 일만 누를 수 있어요. 하나 끝낼 때마다 별 1개!':'지난 날의 기록이에요. 체크는 오늘 것만 할 수 있어요.'}</p>`}
  <div class="grid">${order.map(id=>{const m=by(id),l=tasksOn(id,d),[a,b]=prog(id,d),can=canDo(id,d);
   return `<div class="card stack"><div class="row">${av(id)}<span class="d grow" style="font-size:22px">${m.name}</span>
     ${m.role==='child'?`<span class="chip">⭐ ${S.stars[id]}</span>`:''}<span class="chip">${a}/${b}</span></div>
    ${l.map(t=>{const on=isDone(t,d);return `<div class="taskrow"><button class="task ${on?'done':''}" data-act="toggle" data-id="${t.id}" data-d="${d}" ${can?'':'disabled'} aria-pressed="${on}">
-     <span class="box">✓</span><span class="t grow">${esc(t.t)}</span>${t.daily?`<span class="chip">${t.wk?'평일':'매일'}</span>`:''}</button>
+     <span class="box">✓</span><span class="t grow">${esc(t.t)}</span>${t.daily?`<span class="chip">${repLabel(t)}</span>`:''}</button>
      ${isParent()?`<button class="x" data-act="deltask" data-id="${t.id}" aria-label="${t.daily?'이 날부터 빼기':'할 일 지우기'}">✕</button>`:''}</div>`}).join('')||'<p class="muted">할 일이 없어요.</p>'}
    <p class="small muted">최근 7일 (한 일/할 일)</p>${week(id)}
   </div>`}).join('')}</div>`}
 
 /* ---------- 일정 ---------- */
 function calView(){
- const dayEv=occOn(ui.sel),whoOpts=`<option value="all">가족 모두</option>${M.map(m=>`<option value="${m.id}"${m.id===ui.me&&!isParent()?' selected':''}>${m.name}</option>`).join('')}`;
+ const dayEv=occOn(ui.sel),selfOnly=!isParent()&&!isTablet(),whoChips=`<div class="chips" id="ev-whos"><span class="chips-t">누구 일정 (여러 명 고를 수 있어요)</span>
+     <label><input type="checkbox" id="ew-all" name="w" value="all"${selfOnly?'':' checked'}>가족 모두</label>
+     ${M.map(m=>`<label><input type="checkbox" id="ew-${m.id}" name="w" value="${m.id}"${selfOnly&&m.id===ui.me?' checked':''}>${m.name}</label>`).join('')}</div>`;
  const nums=n=>Array.from({length:n},(_,i)=>`<option>${i+1}</option>`).join('');
  return `<div class="grid" style="align-items:start">
   <div class="stack"><div class="card stack">${calGrid()}
@@ -416,11 +442,11 @@ function calView(){
     <form class="add" data-form="event">
     <label style="grid-column:1/-1">제목<input id="ev-title" name="t" placeholder="예: 제주도 여행" required maxlength="30"></label>
     <label>시작하는 날<input id="ev-date" name="date" type="date" value="${ui.sel}" required></label>
-    <label>끝나는 날 (하루면 비워두기)<input id="ev-end" name="end" type="date"></label>
+    <label>끝나는 날 (하루면 그대로)<input id="ev-end" name="end" type="date" value="${ui.sel}" min="${ui.sel}"></label>
     <label>시간 (선택)<input id="ev-time" name="time" placeholder="예: 오후 4:30" maxlength="12"></label>
-    <label>누구 일정<select id="ev-who" name="who">${whoOpts}</select></label>
+    ${whoChips}
     <label>반복<select id="ev-rep" name="rep"><option value="">반복 안 함</option><option value="week">매주</option><option value="month">매달</option></select></label>
-    <label>언제까지 반복<input id="ev-until" name="until" type="date"></label>
+    <label>언제까지 반복<input id="ev-until" name="until" type="date" min="${ui.sel}"></label>
     <p class="notice" id="ev-err" style="grid-column:1/-1" hidden></p>
     <button class="btn" style="align-self:end">추가</button></form></div>`:''}
    ${isParent()?`<div class="card stack"><h3>기념일 추가 (매년 반복)</h3>
@@ -481,7 +507,7 @@ function chart(r,key,ref){
   ${curves.length?'<p class="small muted">회색 선은 또래 3·50·97백분위예요 (미국 CDC 기준).</p>':''}`}
 
 function healthView(){
- const p=by(ui.hp),meds=S.meds.filter(m=>m.who===p.id),r=recs(p.id),l=r[r.length-1],pv=r[r.length-2],info=S.info[p.id]||{};
+ const p=by(ui.hp),dz=doses(p.id,today),sups=dz.filter(z=>z.m.kind!=='med'),meds=S.meds.filter(m=>m.who===p.id&&m.kind==='med'),r=recs(p.id),l=r[r.length-1],pv=r[r.length-2],info=S.info[p.id]||{};
  const SEX={f:'여자',m:'남자'};
  const age=(()=>{if(!info.birth)return'';const b=new Date(info.birth+'T00:00');let mo=(now.getFullYear()-b.getFullYear())*12+now.getMonth()-b.getMonth()-(now.getDate()<b.getDate()?1:0);
   return mo<0?'':'만 '+Math.floor(mo/12)+'살 '+(mo%12)+'개월'})();
@@ -510,12 +536,22 @@ function healthView(){
    <p class="small muted">${gnote}</p></div>`:'';
  return `<div class="row">${M.map(m=>`<button class="pill ${ui.hp===m.id?'on':''}" data-act="hp" data-id="${m.id}">${av(m.id,'sm')}${m.name}</button>`).join('')}</div>
  <div class="grid">
-  <div class="card stack"><h3>오늘 약·영양제</h3>
-   ${meds.map(m=>medRow(m)).join('')||'<p class="muted">등록된 약·영양제가 없어요.</p>'}
-   ${isParent()?`<form class="add" data-form="med"><input id="med-title" name="t" placeholder="예: 감기약, 비타민C" required maxlength="24">
-     <select id="med-when" name="when" aria-label="언제"><option>아침</option><option>점심</option><option>저녁</option><option>자기 전</option></select>
+  <div class="card stack"><h3>영양제 <span class="small muted">매일</span></h3>
+   ${sups.map(z=>medRow(z,false,true)).join('')||'<p class="muted">등록된 영양제가 없어요.</p>'}
+   ${isParent()?`<form class="add" data-form="sup"><input id="sup-title" name="t" placeholder="예: 비타민D, 유산균" required maxlength="24">
+     <select id="sup-when" name="when" aria-label="언제">${TIMES.map(t=>`<option>${t}</option>`).join('')}</select>
      <button class="btn">추가</button></form>`:''}
-   <p class="small muted">체크는 매일 자정에 새로 시작해요.</p></div>
+   <p class="small muted">한 번 넣으면 매일 나와요. 체크는 매일 자정에 새로 시작해요.</p></div>
+  <div class="card stack"><h3>약 <span class="small muted">기간 동안</span></h3>
+   ${meds.filter(m=>m.from<=today&&today<=m.to).map(m=>`<p class="medsub">${esc(m.t)} · ${nice(m.from)} ~ ${nice(m.to)}</p>`+dz.filter(z=>z.m===m).map(z=>medRow(z,false,true)).join('')).join('')||'<p class="muted">지금 먹는 약이 없어요.</p>'}
+   ${meds.filter(m=>m.from>today).map(m=>`<div class="mini"><span class="t">${esc(m.t)}</span><span class="small muted">${nice(m.from)}부터</span>${isParent()?`<button class="x" data-act="delmed" data-id="${m.id}" aria-label="약 지우기">✕</button>`:''}</div>`).join('')}
+   ${isParent()?`<form class="add" data-form="med">
+     <label style="grid-column:1/-1">약 이름<input id="med-title" name="t" placeholder="예: 감기약, 항생제" required maxlength="24"></label>
+     <label>시작하는 날<input id="med-from" name="from" type="date" value="${today}" required></label>
+     <label>며칠 동안<input id="med-days" name="days" type="number" min="1" max="90" value="3" required></label>
+     <div class="chips"><span class="chips-t">먹는 시간</span>${TIMES.map((t,i)=>`<label><input type="checkbox" id="mt-${i}" name="tm" value="${t}"${i===0||i===2?' checked':''}>${t}</label>`).join('')}</div>
+     <button class="btn" style="align-self:end">추가</button></form>`:''}
+   <p class="small muted">기간이 끝나면 목록에서 자동으로 빠져요.</p></div>
   ${growth}
   <div class="card stack"><h3>${p.name} 건강 정보</h3>
    ${isParent()?`<form class="add" data-form="info" style="grid-template-columns:1fr">
@@ -653,9 +689,9 @@ app.addEventListener('click',e=>{
  else if(a==='tsend'&&isTablet()){ui.tsend=id;ui.replyTo=null}
  else if(a==='toggle'){const t=S.tasks.find(x=>x.id===id),d=b.dataset.d||today;if(t&&canDo(t.who,d)){const on=!isDone(t,d),o={['done.'+d+'.'+t.id]:on?true:deleteField()};
    if(t.who in S.stars){if(on)o['stars.'+t.who]=increment(1);else if(S.stars[t.who]>0)o['stars.'+t.who]=increment(-1)}upd(o)}}
- else if(a==='med'){const m=S.meds.find(x=>x.id===id);if(m&&canCheck(m.who))upd({['taken.'+m.id]:taken(m)?deleteField():today})}
+ else if(a==='med'){const m=S.meds.find(x=>x.id===id),k=b.dataset.k||id;if(m&&canCheck(m.who))upd({['took.'+today+'.'+k]:tookOn(k)?deleteField():true})}
  else if(a==='deltask'&&isParent()){const t=S.tasks.find(x=>x.id===id);if(t)upd(t.daily&&ui.td>t.from?{['tasks.'+t.id+'.stop']:ui.td}:{['tasks.'+t.id]:deleteField()})}
- else if(a==='delmed'&&isParent()){upd({['meds.'+id]:deleteField(),['taken.'+id]:deleteField()})}
+ else if(a==='delmed'&&isParent()){upd({['meds.'+id]:deleteField()})}
  else if(a==='delgrow'&&isParent()){upd({['growth.'+id]:deleteField()})}
  else if(a==='delev'){const ev=S.events.find(x=>x.id===id);if(ev&&(ev.yearly?isParent():canEv()))upd({['events.'+id]:deleteField()})}
  else if(a==='day'){ui.sel=b.dataset.d;if(ui.tab==='home')ui.tab='cal'}
@@ -672,8 +708,14 @@ app.addEventListener('click',e=>{
  else if(a==='skipev'){const ev=S.events.find(x=>x.id===id);if(ev&&ev.rep&&canEv())upd({['events.'+id+'.skip']:arrayUnion(b.dataset.d)})}
  render();
 });
+app.addEventListener('change',e=>{const t=e.target;
+ if(t.id==='ev-date'){const en=document.getElementById('ev-end'),un=document.getElementById('ev-until');
+  if(en){en.min=t.value;if(!en.value||en.value<t.value)en.value=t.value}if(un)un.min=t.value}
+ else if(t.id==='task-rep'){const d=document.getElementById('task-days');if(d)d.hidden=t.value!=='days'}
+ else if(t.name==='w'&&t.checked){document.querySelectorAll('#ev-whos input[name="w"]').forEach(x=>{if(t.value==='all'?x!==t:x.value==='all')x.checked=false})}
+});
 app.addEventListener('submit',e=>{
- e.preventDefault();const f=e.target,k=f.dataset.form,v=n=>f.elements[n].value.trim();
+ e.preventDefault();const f=e.target,k=f.dataset.form,v=n=>f.elements[n].value.trim(),chk=n=>[...f.querySelectorAll('input[name="'+n+'"]:checked')].map(x=>x.value);
  if(k==='login'){ui.loginErr='';
   signInWithEmailAndPassword(auth,v('email'),f.elements.pw.value).catch(err=>{const c=err.code||'';
    ui.loginErr=/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?'이메일이나 비밀번호가 맞지 않아요.':
@@ -682,7 +724,8 @@ app.addEventListener('submit',e=>{
  if(k==='msg'){const t=f.elements.t.value;if(t.trim()){sendMsg(t,false);f.elements.t.value=''}render();const el=document.getElementById('msg-text');if(el)el.focus();return}
  const jump=date=>{ui.sel=date;const d=new Date(date+'T00:00');ui.ym=[d.getFullYear(),d.getMonth()]};
  if(k==='event'){if(!canEv()||!v('t')||!v('date'))return;const date=v('date'),end=v('end');
-  const ev={date,time:v('time'),t:v('t'),who:v('who')};if(end>date)ev.end=end;
+  const ws=chk('w'),pp=ws.filter(x=>x!=='all');
+  const ev={date,time:v('time'),t:v('t'),who:!pp.length||ws.includes('all')||pp.length===M.length?'all':pp.length===1?pp[0]:pp};if(end>date)ev.end=end;
   const rp=v('rep'),until=v('until');
   if(rp){if(!until||until<=date){const er=document.getElementById('ev-err');er.textContent='반복을 고르면, 시작하는 날보다 뒤로 언제까지 반복할지도 정해주세요.';er.hidden=false;return}
    ev.rep=rp;ev.until=until}
@@ -693,9 +736,12 @@ app.addEventListener('submit',e=>{
   const ev={yearly:cal,md:[m,d],time:'',t:v('t'),who:'all'};upd({['events.'+newId('e')]:ev});ui.err='';
   const o=nextOcc(ev);if(o)jump(o.date)}
  else{ if(!isParent())return;
-  if(k==='task'){if(!v('t'))return;const r=v('rep'),nt={who:v('who'),t:v('t')};if(r==='once')nt.date=ui.td;else{nt.daily=true;nt.from=ui.td;if(r==='wk')nt.wk=true}
+  if(k==='task'){if(!v('t'))return;const r=v('rep'),nt={who:v('who'),t:v('t')};if(r==='once')nt.date=ui.td;else{nt.daily=true;nt.from=ui.td;if(r==='wk')nt.wk=true;
+   if(r==='days'){const dd=chk('tdays').map(Number);if(!dd.length)return;nt.days=dd}}
    upd({['tasks.'+newId('t')]:nt})}
-  if(k==='med'){if(!v('t'))return;upd({['meds.'+newId('m')]:{who:ui.hp,t:v('t'),when:v('when')}})}
+  if(k==='sup'){if(!v('t'))return;upd({['meds.'+newId('m')]:{kind:'sup',who:ui.hp,t:v('t'),when:v('when')}})}
+  if(k==='med'){const from=v('from'),n=Math.max(1,Math.min(90,parseInt(v('days'),10)||0)),tm=chk('tm');if(!v('t')||!from||!tm.length)return;
+   upd({['meds.'+newId('m')]:{kind:'med',who:ui.hp,t:v('t'),from,to:fromDn(dn(from)+n-1),times:TIMES.filter(t=>tm.includes(t))}})}
   if(k==='grow'){const cm=parseFloat(v('cm')),kg=parseFloat(v('kg'));if(!v('date')||!(cm>0)||!(kg>0))return;
    upd({['growth.'+newId('g')]:{who:ui.hp,date:v('date'),cm,kg}})}
   if(k==='info'){upd({['info.'+ui.hp]:{birth:v('birth'),sex:v('sex'),blood:v('blood'),allergy:v('allergy'),clinic:v('clinic'),memo:v('memo')}})}
