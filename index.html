@@ -33,6 +33,7 @@
 *{box-sizing:border-box}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:50}
 img{max-width:100%} [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
 .wrap{max-width:1040px;margin:0 auto;padding-block:20px 48px;
@@ -141,6 +142,8 @@ form.add input[type="checkbox"]{width:24px;height:24px;padding:0;border:0;accent
 .week b.full{background:var(--ok);color:var(--surface)}
 .week .cur{box-shadow:inset 0 0 0 2px var(--ink)}
 .ev{flex-wrap:wrap}
+.ev>.grow{flex:1 1 170px}
+.ev .evbtns{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .chat{gap:14px}
 .msgs{display:flex;flex-direction:column;gap:12px;height:min(52vh,520px);overflow-y:auto;padding:4px 2px;overscroll-behavior:contain}
 .msg{display:flex;gap:8px;align-items:flex-end;max-width:88%}
@@ -323,7 +326,7 @@ function evRow(o,del){const e=o.e,multi=o.end>o.date,nights=multi?Math.round((ne
  const chip=o.date<today&&o.end>=today?'진행 중':dday(o.date);
  return `<div class="ev">${avs(e.who)}
  <div class="grow"><div class="t">${esc(e.t)}</div><div class="small muted">${when} · ${whoName(e.who)}${e.yearly?` · 매년 ${e.yearly==='lunar'?'음력':'양력'} ${e.md[0]}월 ${e.md[1]}일`:''}${e.rep?` · ${e.rep==='week'?'매주':'매달'} 반복 (${nice(e.until)}까지)`:''}</div></div>
- <span class="chip">${chip}</span>${!del?'':e.rep?`<button class="btn ghost sm" data-act="skipev" data-id="${e.id}" data-d="${o.date}">이 날만 빼기</button><button class="btn ghost sm" data-act="delev" data-id="${e.id}">전체 삭제</button>`
+ <span class="chip">${chip}</span>${!del?'':e.rep?`<span class="evbtns"><button class="btn ghost sm" data-act="skipev" data-id="${e.id}" data-d="${o.date}">이 날만 빼기</button><button class="btn ghost sm" data-act="delev" data-id="${e.id}">전체 삭제</button></span>`
   :`<button class="x" data-act="delev" data-id="${e.id}" aria-label="일정 지우기">✕</button>`}</div>`}
 const upcoming=()=>S.events.map(nextOcc).filter(Boolean).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
 const upList=n=>upcoming().slice(0,n).map(o=>evRow(o)).join('')||'<p class="muted">다가오는 일정이 없어요.</p>';
