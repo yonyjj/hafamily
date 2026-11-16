@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isFamily() {
+      return request.auth != null
+        && request.auth.token.email == '가족계정이메일@gmail.com';
+    }
+    match /families/main {
+      allow read, write: if isFamily();
+      match /messages/{id} {
+        allow read, create, delete: if isFamily();
+      }
+      match /devices/{id} {
+        allow read, write: if isFamily();
+      }
+    }
+  }
+}

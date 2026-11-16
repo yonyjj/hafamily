@@ -187,7 +187,8 @@ table.rec td{padding:6px 4px;border-top:1px solid var(--line)}
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,onSnapshot,setDoc,updateDoc,deleteField,increment,arrayUnion,collection as fsCollection,query as fsQuery,orderBy as fsOrderBy,limit as fsLimit,addDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import {getMessaging,getToken,isSupported as pushSupported} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,onSnapshot,setDoc,updateDoc,deleteField,increment,arrayUnion,collection as fsCollection,query as fsQuery,orderBy as fsOrderBy,limit as fsLimit,addDoc,serverTimestamp,deleteDoc} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 (function(){
 const M=[
  {id:'mom',name:'엄마',role:'parent'},{id:'dad',name:'아빠',role:'parent'},
@@ -212,6 +213,9 @@ const REF=doc(fdb,'families','main');
 const MSGS=fsCollection(fdb,'families','main','messages');
 let MSG=[];
 const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}};
+const DEV=lsGet('hafamily-dev')||(()=>{const d=newId('d');lsSet('hafamily-dev',d);return d})();
+const START_CHAT=location.hash==='#chat';
 const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},events:[],meds:[],taken:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{}});
 function fromDoc(d){const o=EMPTY();
  for(const k of['faces','stars','done','taken','info','pins','reads'])Object.assign(o[k],d[k]||{});
@@ -224,7 +228,7 @@ function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily
 let S=EMPTY(),ready=false,syncErr='';
 function upd(o){if(!ready)return;updateDoc(REF,o).catch(err=>{syncErr='저장하지 못했어요 ('+(err.code||err.message)+'). 인터넷 연결을 확인해 주세요.';render()})}
 
-const ui={view:'loading',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
+const ui={view:'loading',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
 const isTablet=()=>ui.me==='tablet';
 const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||ui.me==='eun';
@@ -544,6 +548,7 @@ function chatView(){
  const quick=by(me).role==='parent'?QUICK_PARENT:QUICK_KID;
  return `<div class="card stack chat">
   <div class="row"><h3 class="grow">우리가족 방</h3><span class="muted">${M.map(m=>S.faces[m.id]).join(' ')}</span></div>
+  ${pushCard()}
   <div class="msgs" id="msgs">${bubbles||'<p class="muted" style="text-align:center;margin:auto">아직 메시지가 없어요. 첫 인사를 보내 보세요!</p>'}</div>
   ${isTablet()?`<div class="row"><span class="small muted">보내는 사람</span>${['eun','yeon'].map(i=>`<button class="pill ${ui.tsend===i?'on':''}" data-act="tsend" data-id="${i}">${av(i,'sm')}${by(i).name}</button>`).join('')}</div>`:''}
   ${target?`<div class="row notice"><span class="grow">${nameOf(target.from)}의 "${esc(target.text.slice(0,30))}"에 답장</span><button class="x" data-act="replyx" aria-label="답장 취소">✕</button></div>`:''}
@@ -552,11 +557,34 @@ function chatView(){
   <p class="small muted">${by(me).role==='parent'?'아이 메시지를 누르면 그 메시지에 답장할 수 있어요.':'다른 사람 메시지를 누르면 답장할 수 있어요.'}</p>
  </div>`}
 function sendMsg(text,quick){const from=sender();text=(text||'').trim();if(!ready||!text||!from)return;
- const m={from,text,quick:!!quick,ts:serverTimestamp()};if(ui.replyTo)m.reply=ui.replyTo;ui.replyTo=null;ui.scrollEnd=true;
+ const m={from,text,quick:!!quick,ts:serverTimestamp(),dev:DEV};if(ui.replyTo)m.reply=ui.replyTo;ui.replyTo=null;ui.scrollEnd=true;
  addDoc(MSGS,m).catch(err=>{syncErr='메시지를 보내지 못했어요 ('+(err.code||err.message)+')';render()})}
 function msgCard(){const last=MSG.slice(-3),n=unread();
  return `<div class="card stack"><div class="row"><h3 class="grow">가족방${n?`<span class="badge">${n}</span>`:''}</h3><button class="btn ghost sm" data-act="tab" data-t="chat">열기</button></div>
   ${last.map(m=>`<div class="mini">${av(m.from,'sm')}<span class="t">${esc(m.text)}</span><span class="small muted">${hm(m.ts)}</span></div>`).join('')||'<p class="muted">아직 메시지가 없어요.</p>'}</div>`}
+/* ---------- 알림: 이 기기에서 켜기 ---------- */
+const IOS_HINT='이 기기에서는 알림을 켤 수 없어요. 아이폰·아이패드는 사파리에서 "홈 화면에 추가"한 앱 아이콘으로 열어서 켜 주세요.';
+const pushOn=()=>!!lsGet('hafamily-push')&&typeof Notification!=='undefined'&&Notification.permission==='granted';
+async function saveToken(who){
+ const reg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+ const token=await getToken(getMessaging(fbApp),{serviceWorkerRegistration:reg});
+ if(!token)throw new Error('토큰 없음');
+ await setDoc(doc(fdb,'families','main','devices',DEV),{token,who,updated:Date.now(),ua:navigator.userAgent.slice(0,120)});
+ lsSet('hafamily-push',who)}
+function enablePush(){
+ if(typeof Notification==='undefined'||!('serviceWorker' in navigator)){ui.pushMsg=IOS_HINT;render();return}
+ const who=isTablet()?'tablet':ui.me;
+ Notification.requestPermission().then(async perm=>{
+  if(perm!=='granted'){ui.pushMsg='알림이 허용되지 않았어요. 기기 설정에서 이 앱(또는 브라우저)의 알림을 허용한 뒤 다시 눌러 주세요.';render();return}
+  if(!(await pushSupported())){ui.pushMsg=IOS_HINT;render();return}
+  ui.pushMsg='알림을 켜는 중…';render();
+  await saveToken(who);ui.pushMsg='이 기기에서 알림을 받아요. 다른 가족이 메시지를 보내면 알려 드려요.';render()
+ }).catch(e=>{ui.pushMsg='알림을 켜지 못했어요 ('+(e.code||e.message)+')';render()})}
+function disablePush(){deleteDoc(doc(fdb,'families','main','devices',DEV)).catch(()=>{});lsSet('hafamily-push',null);ui.pushMsg='이 기기의 알림을 껐어요.';render()}
+function pushCard(){const on=pushOn(),who=lsGet('hafamily-push');
+ return `<div class="row notice"><span class="grow">${on?`🔔 이 기기에서 알림을 받고 있어요${who&&who!=='tablet'&&by(who)?' ('+by(who).name+')':who==='tablet'?' (공용 태블릿)':''}`:'🔕 이 기기는 메시지 알림이 꺼져 있어요'}</span>
+  ${on?'<button class="btn ghost sm" data-act="pushoff">알림 끄기</button>':'<button class="btn sm" data-act="pushon">알림 켜기</button>'}</div>
+  ${ui.pushMsg?`<p class="small muted">${esc(ui.pushMsg)}</p>`:''}`}
 let actx=null;
 function ding(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const t=actx.currentTime;
  [880,1175].forEach((f,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.setValueAtTime(.0001,t+i*.12);
@@ -596,7 +624,7 @@ function markRead(){if(!ready||ui.view!=='main'||ui.tab!=='chat'||!MSG.length)re
 const ME_KEY='hafamily-me';
 const remembered=()=>{try{const v=localStorage.getItem(ME_KEY);return v==='tablet'||v==='eun'||v==='yeon'?v:null}catch(e){return null}};
 const remember=v=>{try{if(v)localStorage.setItem(ME_KEY,v);else localStorage.removeItem(ME_KEY)}catch(e){}};
-function enter(id){ui.td=today;ui.me=id;ui.tab='home';ui.view='main';ui.pick=null;ui.hp=id==='tablet'?'eun':id;
+function enter(id){ui.td=today;ui.me=id;ui.tab=ui.startChat?'chat':'home';ui.startChat=false;ui.view='main';ui.pick=null;ui.hp=id==='tablet'?'eun':id;
  remember(id==='tablet'||by(id).role==='child'?id:null)}
 async function hashPin(who,pin){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hafamily:'+who+':'+pin));
  return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -620,6 +648,8 @@ app.addEventListener('click',e=>{
  else if(a==='quick'){sendMsg(b.dataset.t,true)}
  else if(a==='replyto'){const m=MSG.find(x=>x.id===id);if(m&&m.from!==sender())ui.replyTo=id}
  else if(a==='replyx'){ui.replyTo=null}
+ else if(a==='pushon'){enablePush();return}
+ else if(a==='pushoff'){disablePush();return}
  else if(a==='tsend'&&isTablet()){ui.tsend=id;ui.replyTo=null}
  else if(a==='toggle'){const t=S.tasks.find(x=>x.id===id),d=b.dataset.d||today;if(t&&canDo(t.who,d)){const on=!isDone(t,d),o={['done.'+d+'.'+t.id]:on?true:deleteField()};
    if(t.who in S.stars){if(on)o['stars.'+t.who]=increment(1);else if(S.stars[t.who]>0)o['stars.'+t.who]=increment(-1)}upd(o)}}
@@ -686,7 +716,9 @@ onAuthStateChanged(auth,user=>{
  unsub=onSnapshot(REF,snap=>{
   if(!snap.exists()){if(!snap.metadata.fromCache)setDoc(REF,seedDoc()).catch(err=>{syncErr='처음 설정을 저장하지 못했어요 ('+err.code+'). 보안 규칙을 확인해 주세요.';render()});return}
   S=fromDoc(snap.data());syncErr='';
-  if(!ready){ready=true;const r=remembered();if(r)enter(r);else ui.view='who';render();return}
+  if(!ready){ready=true;
+   if(pushOn())pushSupported().then(ok=>ok&&saveToken(lsGet('hafamily-push'))).catch(()=>{});
+   const r=remembered();if(r)enter(r);else ui.view='who';render();return}
   render(true)},
  err=>{syncErr=err.code==='permission-denied'?'이 계정으로는 가족 데이터를 볼 수 없어요. Firestore 보안 규칙에 적은 이메일과 로그인한 이메일이 같은지 확인해 주세요.':'연결하지 못했어요 ('+err.code+')';render()});
  unsubM=onSnapshot(fsQuery(MSGS,fsOrderBy('ts','desc'),fsLimit(100)),snap=>{
