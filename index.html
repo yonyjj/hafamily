@@ -191,6 +191,10 @@ form.add .chips input[type="checkbox"]{position:absolute;opacity:0;width:1px;hei
 .reward form{display:flex;gap:6px;align-items:center}
 .reward input{width:76px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:6px 8px}
 .chip.ok{background:var(--ok);color:var(--surface)}
+.lbox.rbox{width:46px;height:46px;flex:none}
+.rbox[disabled]{cursor:default}.rbox[disabled]:not(.on){opacity:.45}
+.rbox:not([disabled]):not(.on){border-color:var(--ok);border-width:3px}
+.reward.used .t{text-decoration:line-through;color:var(--muted)}
 .ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:10px 12px;margin-top:-4px}
 .ask span{flex:1 1 160px}
 .wx{background:var(--surface);border-radius:999px;padding:8px 18px;font-size:17px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -278,7 +282,7 @@ function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily
 let S=EMPTY(),ready=false,syncErr='';
 function upd(o){if(!ready)return;updateDoc(REF,o).catch(err=>{syncErr='저장하지 못했어요 ('+(err.code||err.message)+'). 인터넷 연결을 확인해 주세요.';render()})}
 
-const ui={view:'loading',delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
+const ui={view:'loading',delR:null,delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
 const isTablet=()=>ui.me==='tablet';
 const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||isTablet();
@@ -430,7 +434,7 @@ function dashView(){
  const kids=M.filter(m=>m.role==='child');
  return `<div class="dash">
   ${kids.map((m,i)=>{const[a,b]=prog(m.id),r=recs(m.id),l=r[r.length-1];return `<div class="card s6 k${i+1} stack">
-    <div class="row">${av(m.id,'lg')}<span class="d grow" style="font-size:30px">${m.name}</span><span class="chip" style="font-size:18px">⭐ ${S.stars[m.id]}</span></div>
+    <div class="row">${av(m.id,'lg')}<span class="d grow" style="font-size:30px">${m.name}</span><button class="chip" style="font-size:18px" data-act="tab" data-t="reward" aria-label="${m.name} 별 ${S.stars[m.id]}개, 보상 보기">⭐ ${S.stars[m.id]} ›</button></div>
     <button data-act="tab" data-t="reward" style="text-align:left" aria-label="${m.name} 별·보상 보기">${starBar(m.id,true)}<span class="small muted">다음 목표 ${nextGoal(S.stars[m.id]||0)}개까지 ${nextGoal(S.stars[m.id]||0)-(S.stars[m.id]||0)}개</span></button>
     <button class="chip" style="align-self:flex-start" data-act="grow" data-id="${m.id}">📏 ${l?l.cm.toFixed(1)+'cm · '+l.kg.toFixed(1)+'kg':'키·몸무게 재기'} ›</button>
     <div class="bar"><i style="width:${b?a/b*100:0}%"></i></div>
@@ -448,25 +452,34 @@ function dashView(){
 
 /* ---------- 별·보상: 50개마다 목표선, 보상은 은우도 추가, 별 개수는 엄마·아빠가 정함 ---------- */
 const STEP=50;
-function starBar(who,small){const n=S.stars[who]||0,rs=S.rewards.filter(r=>r.who===who&&r.cost>0);
+const usedOn=r=>r.used||(r.given&&r.given.length?r.given[r.given.length-1]:null);
+/* 보상을 고치거나 쓸 수 있는 사람: 엄마·아빠는 모두, 은우(태블릿)는 은우 것만 */
+const canR=r=>isParent()||(isTablet()&&r.who==='eun');
+function starBar(who,small){const n=S.stars[who]||0,rs=S.rewards.filter(r=>r.who===who&&r.cost>0&&!usedOn(r));
  const top=Math.max(STEP,Math.ceil((Math.max(n,0,...rs.map(r=>r.cost))+1)/STEP)*STEP),pct=v=>Math.min(100,v/top*100);
  let ticks='';for(let v=0;v<=top;v+=STEP)ticks+=`<span class="tick ${v===0?'first':v===top?'last':''} ${v>0&&v<top&&n>=v?'reached':''}" style="left:${pct(v)}%"><b>${v}</b></span>`;
  return `<div class="sbar ${small?'small':''}" role="img" aria-label="별 ${n}개, 다음 목표 ${Math.floor(n/STEP)*STEP+STEP}개"><div class="strack"><i style="width:${pct(n)}%"></i>${ticks}
   ${small?'':rs.map(r=>`<span class="rmark ${n>=r.cost?'ok':''}" style="left:${pct(r.cost)}%" title="${esc(r.t)} · 별 ${r.cost}개">🎁</span>`).join('')}</div></div>`}
 const nextGoal=n=>Math.floor(n/STEP)*STEP+STEP;
-function rewardView(){const kids=M.filter(m=>m.role==='child'),canAdd=isParent()||isTablet();
- return `<div class="grid">${kids.map(m=>{const n=S.stars[m.id]||0,rs=S.rewards.filter(r=>r.who===m.id).sort((a,b)=>(a.cost||1e9)-(b.cost||1e9));
+function rewardView(){const kids=M.filter(m=>m.role==='child');
+ return `<div class="grid">${kids.map(m=>{const n=S.stars[m.id]||0,mine=isParent()||(isTablet()&&m.id==='eun');
+  const rs=S.rewards.filter(r=>r.who===m.id).sort((a,b)=>(usedOn(a)?1:0)-(usedOn(b)?1:0)||(a.cost||1e9)-(b.cost||1e9));
   return `<div class="card stack"><div class="row">${av(m.id,'lg')}<span class="d grow" style="font-size:28px">${m.name}</span><span class="chip" style="font-size:20px">⭐ ${n}</span></div>
    ${starBar(m.id)}
    <p class="small muted">다음 목표 ${nextGoal(n)}개까지 ${nextGoal(n)-n}개 남았어요. 할 일을 하나 끝낼 때마다 별 1개!</p>
    <h3>갖고 싶은 보상</h3>
-   ${rs.map(r=>{const ok=r.cost>0&&n>=r.cost;return `<div class="reward"><span style="font-size:26px">🎁</span><div class="grow"><div class="t">${esc(r.t)}</div>
-     <div class="small muted">${r.cost>0?`별 ${r.cost}개`:'별 몇 개인지는 엄마·아빠가 정해요'}${r.given&&r.given.length?` · 받은 날 ${r.given.map(d=>nice(d)).join(', ')}`:''}</div></div>
-     ${ok?'<span class="chip ok">받을 수 있어요!</span>':r.cost>0?`<span class="chip">${r.cost-n}개 더</span>`:''}
-     ${isParent()?`<form data-form="rcost" data-id="${r.id}"><input id="rc-${r.id}" name="cost" type="number" min="1" max="9999" placeholder="별 개수" value="${r.cost||''}" aria-label="필요한 별 개수"><button class="btn ghost sm">정하기</button></form>
-      ${ok?`<button class="btn sm" data-act="give" data-id="${r.id}">보상 주기</button>`:''}<button class="x" data-act="delreward" data-id="${r.id}" aria-label="보상 지우기">✕</button>`:''}</div>
-     ${ui.giveAsk===r.id?`<div class="ask"><span>별 ${r.cost}개를 쓰고 "${esc(r.t)}"를 줄까요?</span><button class="btn sm" data-act="give1" data-id="${r.id}">네</button><button class="btn ghost sm" data-act="delno">취소</button></div>`:''}`}).join('')||'<p class="muted">아직 보상이 없어요. 갖고 싶은 걸 적어 보세요!</p>'}
-   ${canAdd&&(isParent()||m.id==='eun')?`<form class="add" data-form="reward" data-who="${m.id}"><input id="rw-${m.id}" name="t" placeholder="예: 레고 사기, 게임 30분 더" required maxlength="30"><button class="btn">보상 추가</button></form>`:''}
+   ${rs.length&&mine?'<p class="small muted">별이 모이면 왼쪽 네모를 눌러 보상을 사용해요. 사용하면 그만큼 별이 줄어요.</p>':''}
+   ${rs.map(r=>{const used=usedOn(r),ok=!used&&r.cost>0&&n>=r.cost,can=canR(r);
+    return `<div class="reward ${used?'used':''}">
+     <button class="lbox rbox ${used?'on':''}" data-act="give" data-id="${r.id}" ${ok&&can?'':'disabled'} aria-pressed="${!!used}" aria-label="${esc(r.t)} 보상 사용${used?'함':''}">${used?'✓':''}</button>
+     <div class="grow"><div class="t">${esc(r.t)}</div>
+      <div class="small muted">${r.cost>0?`별 ${r.cost}개`:'별 몇 개인지는 엄마·아빠가 정해요'}${used?` · 사용한 날 ${nice(used)}`:''}</div></div>
+     ${used?'':ok?'<span class="chip ok">사용할 수 있어요!</span>':r.cost>0?`<span class="chip">${r.cost-n}개 더</span>`:'<span class="chip">별 개수 기다리는 중</span>'}
+     ${isParent()&&!used?`<form data-form="rcost" data-id="${r.id}"><input id="rc-${r.id}" name="cost" type="number" min="1" max="9999" placeholder="별 개수" value="${r.cost||''}" aria-label="차감할 별 개수"><button class="btn ghost sm">정하기</button></form>`:''}
+     ${can?`<button class="x" data-act="delreward" data-id="${r.id}" aria-label="보상 지우기">✕</button>`:''}</div>
+     ${ui.giveAsk===r.id?`<div class="ask"><span>별 ${r.cost}개를 쓰고 "${esc(r.t)}" 보상을 사용할까요?</span><button class="btn sm" data-act="give1" data-id="${r.id}">네</button><button class="btn ghost sm" data-act="delno">취소</button></div>`:''}
+     ${ui.delR===r.id?`<div class="ask"><span>"${esc(r.t)}" 보상을 지울까요?</span><button class="btn sm" data-act="delreward1" data-id="${r.id}">네</button><button class="btn ghost sm" data-act="delno">취소</button></div>`:''}`}).join('')||'<p class="muted">아직 보상이 없어요. 갖고 싶은 걸 적어 보세요!</p>'}
+   ${mine?`<form class="add" data-form="reward" data-who="${m.id}"><input id="rw-${m.id}" name="t" placeholder="예: 레고 사기, 게임 30분 더" required maxlength="30"><button class="btn">보상 추가</button></form>`:''}
   </div>`}).join('')}</div>`}
 
 /* ---------- 할 일 ---------- */
@@ -776,7 +789,7 @@ app.addEventListener('click',e=>{
  else if(a==='switch'){ui.view='who';ui.me=null;ui.replyTo=null;remember(null)}
  else if(a==='logout'){remember(null);signOut(auth)}
  else if(a==='pinreset'&&isParent()){ui.pinRemember=lsGet('hafamily-me')===ui.me;ui.pend=ui.me;ui.pin='';ui.pinMsg='';ui.pinNew=true;ui.view='pin'}
- else if(a==='tab'){ui.tab=b.dataset.t;if(ui.tab==='chat')ui.scrollEnd=true}
+ else if(a==='tab'){ui.giveAsk=null;ui.delR=null;ui.tab=b.dataset.t;if(ui.tab==='chat')ui.scrollEnd=true}
  else if(a==='quick'){sendMsg(b.dataset.t,true)}
  else if(a==='replyto'){const m=MSG.find(x=>x.id===id);if(m&&m.from!==sender())ui.replyTo=id}
  else if(a==='replyx'){ui.replyTo=null}
@@ -789,15 +802,16 @@ app.addEventListener('click',e=>{
  else if(a==='deltask'&&isParent()){const t=S.tasks.find(x=>x.id===id);if(t){if(t.daily)ui.delAsk=t.id;else upd({['tasks.'+t.id]:deleteField()})}}
  else if(a==='deltask1'&&isParent()){upd({['tasks.'+id+'.skip']:arrayUnion(b.dataset.d)});ui.delAsk=null}
  else if(a==='deltaskall'&&isParent()){const t=S.tasks.find(x=>x.id===id);if(t)upd(ui.td>t.from?{['tasks.'+t.id+'.stop']:ui.td}:{['tasks.'+t.id]:deleteField()});ui.delAsk=null}
- else if(a==='delno'){ui.delAsk=null;ui.giveAsk=null}
- else if(a==='give'&&isParent()){ui.giveAsk=id}
+ else if(a==='delno'){ui.delAsk=null;ui.giveAsk=null;ui.delR=null}
+ else if(a==='give'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r)&&!usedOn(r)&&r.cost>0&&(S.stars[r.who]||0)>=r.cost){ui.giveAsk=id;ui.delR=null}}
  else if(a==='wxgo'){ui.tab='home';render();const el=document.getElementById('wx-q');if(el){if(el.scrollIntoView)el.scrollIntoView({block:'center'});el.focus()}return}
  else if(a==='wxretry'){WX=null;loadWx(true)}
  else if(a==='lunch'&&LUNCH.includes(id)){const d=b.dataset.d;upd({['lunch.'+d+'.'+id]:lunchOn(d,id)?deleteField():true})}
  else if(a==='wxpick'&&isParent()){const x=(ui.wxRes||[])[+b.dataset.i];if(x){upd({['settings.weather']:{name:x.name,lat:x.lat,lon:x.lon,unit:(S.settings.weather&&S.settings.weather.unit)||'F'}});ui.wxRes=null;ui.wxMsg='';WX=null;wxKey=''}}
  else if(a==='wxunit'&&isParent()&&S.settings.weather){upd({['settings.weather.unit']:b.dataset.u});WX=null;wxKey=''}
- else if(a==='give1'&&isParent()){const r=S.rewards.find(x=>x.id===id);if(r&&r.cost>0&&(S.stars[r.who]||0)>=r.cost)upd({['stars.'+r.who]:increment(-r.cost),['rewards.'+id+'.given']:arrayUnion(today)});ui.giveAsk=null}
- else if(a==='delreward'&&isParent()){upd({['rewards.'+id]:deleteField()})}
+ else if(a==='give1'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r)&&!usedOn(r)&&r.cost>0&&(S.stars[r.who]||0)>=r.cost)upd({['stars.'+r.who]:increment(-r.cost),['rewards.'+id+'.used']:today});ui.giveAsk=null}
+ else if(a==='delreward'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r)){ui.delR=id;ui.giveAsk=null}}
+ else if(a==='delreward1'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r))upd({['rewards.'+id]:deleteField()});ui.delR=null}
  else if(a==='delmed'&&isParent()){upd({['meds.'+id]:deleteField()})}
  else if(a==='delgrow'&&isParent()){upd({['growth.'+id]:deleteField()})}
  else if(a==='delev'){const ev=S.events.find(x=>x.id===id);if(ev&&(ev.yearly?isParent():canEv()))upd({['events.'+id]:deleteField()})}
