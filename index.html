@@ -266,7 +266,7 @@ const START_CHAT=location.hash==='#chat';
 const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},lunch:{},events:[],rewards:[],meds:[],taken:{},took:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{},settings:{}});
 function fromDoc(d){const o=EMPTY();
  for(const k of['faces','stars','done','taken','took','info','pins','reads','settings','lunch'])Object.assign(o[k],d[k]||{});
- for(const k of['tasks','events','meds','growth','rewards'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id}));
+ for(const k of['tasks','events','meds','growth','rewards'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
  for(const m of['mom','dad','eun','yeon'])o.info[m]=o.info[m]||{};return o}
 function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily:true,from:today}};
  add('eun','숙제하기');add('eun','책 읽기 20분');add('eun','책가방 싸기');add('eun','양치질');
@@ -417,7 +417,7 @@ function lunchWeek(){const t=new Date(today+'T00:00'),w=t.getDay(),mon=new Date(
  return[0,1,2,3,4].map(i=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ds(d)})}
 const lunchOn=(d,w)=>!!(S.lunch[d]&&S.lunch[d][w]);
 function lunchCard(){const days=lunchWeek();
- return `<div class="row"><h3 class="grow">도시락</h3><span class="small muted">${days[0]>today?'다음 주':'이번 주'} · 싸 가면 눌러서 체크</span></div>
+ return `<div class="row"><h3 class="grow">도시락</h3><span class="small muted">${days[0]>today?'다음 주':'이번 주'} · Home lunch 필요 시 체크</span></div>
  <table class="lunch"><colgroup><col class="lname"><col span="5"></colgroup><thead><tr><th></th>${days.map(d=>`<th class="${d===today?'now':''}">${WD[dow(d)]}<span>${+d.slice(5,7)}/${+d.slice(8)}</span></th>`).join('')}</tr></thead>
  <tbody>${LUNCH.map(w=>`<tr><th scope="row"><div>${av(w,'sm')}${by(w).name}</div></th>${days.map(d=>{const on=lunchOn(d,w);
   return `<td class="${d===today?'now':''}"><button class="lbox ${on?'on':''}" data-act="lunch" data-d="${d}" data-id="${w}" aria-pressed="${on}" aria-label="${by(w).name} ${nice(d)} 도시락${on?' 싸 감':''}">${on?'✓':''}</button></td>`}).join('')}</tr>`).join('')}</tbody></table>`}
@@ -695,10 +695,10 @@ const WXC=c=>c===0?['☀️','맑음']:c<=2?['🌤️','구름 조금']:c===3?['
 function loadWx(force){const w=S.settings.weather;if(!w)return;const u=w.unit==='C'?'C':'F',key=w.lat+','+w.lon+','+u+','+today;
  if(!force&&key===wxKey)return;wxKey=key;
  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=auto&forecast_days=1${u==='F'?'&temperature_unit=fahrenheit':''}`)
-  .then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+  .then(async r=>{const j=await r.json().catch(()=>null);if(!r.ok||!j||j.error)throw new Error((j&&j.reason)||('서버 응답 '+r.status));return j})
   .then(j=>{const d=j.daily||{};WX={max:d.temperature_2m_max[0],min:d.temperature_2m_min[0],pop:d.precipitation_probability_max?d.precipitation_probability_max[0]:null,code:d.weather_code[0],cur:j.current?j.current.temperature_2m:null,ccode:j.current?j.current.weather_code:null,u};render(true)})
-  .catch(()=>{WX={err:true};render(true)})}
-function wxChip(){if(!S.settings.weather)return'';if(!WX)return'<span class="wx muted">날씨 불러오는 중…</span>';if(WX.err)return'<span class="wx muted">날씨를 못 불러왔어요</span>';
+  .catch(e=>{WX={err:String(e&&e.message||e||'알 수 없는 오류').slice(0,80)};wxKey='';render(true)})}
+function wxChip(){if(!S.settings.weather)return isParent()?'<button class="wx" data-act="wxgo">🌤️ 날씨 지역 정하기</button>':'<span class="wx muted">🌤️ 날씨: 엄마·아빠 폰에서 지역을 정해 주세요</span>';if(!WX)return'<span class="wx muted">날씨 불러오는 중…</span>';if(WX.err)return'<span class="wx muted">날씨를 못 불러왔어요</span>';
  const[ic,txt]=WXC(WX.ccode!=null?WX.ccode:WX.code),r=Math.round;
  return `<span class="wx" title="${esc(S.settings.weather.name)}">${ic} ${WX.cur!=null?`<b>${r(WX.cur)}°</b> `:''}${txt} · 최고 ${r(WX.max)}° 최저 ${r(WX.min)}°${WX.pop!=null?` · ${WX.pop>=50?'☔ ':''}강수 ${WX.pop}%`:''}</span>`}
 function wxSearch(q){if(!q)return;ui.wxRes=null;ui.wxMsg='찾는 중…';render();
@@ -707,7 +707,8 @@ function wxSearch(q){if(!q)return;ui.wxRes=null;ui.wxMsg='찾는 중…';render(
   .catch(()=>{ui.wxMsg='검색하지 못했어요. 인터넷 연결을 확인해 주세요.';render()})}
 function wxCard(){const w=S.settings.weather;
  return `<div class="card stack"><div class="row"><h3 class="grow">대시보드 날씨</h3>${w?wxChip():''}</div>
-  <p class="small muted">${w?`지역: ${esc(w.name)}`:'지역을 정하면 공용 태블릿 대시보드 시계 옆에 오늘 날씨가 나와요.'}</p>
+  <p class="small muted">${w?`지역: ${esc(w.name)}`:'지역을 정하면 홈 화면 위쪽에 오늘 날씨가 나와요. 도시 이름을 찾아서 고르면 돼요.'}</p>
+  ${w&&WX&&WX.err?`<div class="row notice"><span class="grow">날씨를 불러오지 못했어요: ${esc(WX.err)}</span><button class="btn ghost sm" data-act="wxretry">다시 시도</button></div>`:''}
   <form class="add" data-form="wxq"><input id="wx-q" name="q" placeholder="도시 이름 (예: 애틀랜타, Atlanta)" maxlength="40"><button class="btn">찾기</button></form>
   ${ui.wxMsg?`<p class="small muted">${esc(ui.wxMsg)}</p>`:''}
   ${(ui.wxRes||[]).map((x,i)=>`<button class="mini" data-act="wxpick" data-i="${i}" style="text-align:left"><span class="t">📍 ${esc(x.name)}</span><span class="small muted">고르기</span></button>`).join('')}
@@ -787,6 +788,8 @@ app.addEventListener('click',e=>{
  else if(a==='deltaskall'&&isParent()){const t=S.tasks.find(x=>x.id===id);if(t)upd(ui.td>t.from?{['tasks.'+t.id+'.stop']:ui.td}:{['tasks.'+t.id]:deleteField()});ui.delAsk=null}
  else if(a==='delno'){ui.delAsk=null;ui.giveAsk=null}
  else if(a==='give'&&isParent()){ui.giveAsk=id}
+ else if(a==='wxgo'){ui.tab='home';render();const el=document.getElementById('wx-q');if(el){if(el.scrollIntoView)el.scrollIntoView({block:'center'});el.focus()}return}
+ else if(a==='wxretry'){WX=null;loadWx(true)}
  else if(a==='lunch'&&LUNCH.includes(id)){const d=b.dataset.d;upd({['lunch.'+d+'.'+id]:lunchOn(d,id)?deleteField():true})}
  else if(a==='wxpick'&&isParent()){const x=(ui.wxRes||[])[+b.dataset.i];if(x){upd({['settings.weather']:{name:x.name,lat:x.lat,lon:x.lon,unit:(S.settings.weather&&S.settings.weather.unit)||'F'}});ui.wxRes=null;ui.wxMsg='';WX=null;wxKey=''}}
  else if(a==='wxunit'&&isParent()&&S.settings.weather){upd({['settings.weather.unit']:b.dataset.u});WX=null;wxKey=''}
