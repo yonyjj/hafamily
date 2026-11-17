@@ -196,6 +196,9 @@ form.add .chips input[type="checkbox"]{position:absolute;opacity:0;width:1px;hei
 .wx{background:var(--surface);border-radius:999px;padding:8px 18px;font-size:17px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
 .wx b{font-family:var(--display);font-weight:400;font-size:24px}
 .fitpage .wx{padding:4px 14px}
+.wxline .wx{display:inline-block;white-space:normal;background:var(--bg)}
+.row>h3.grow{flex:1 1 6em}
+.row>.grow>h3{white-space:nowrap}
 .lunch{width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed}
 .lunch th{font-weight:500;font-size:14px;color:var(--muted);text-align:center}
 .lunch thead th span{display:block;font-size:11px;font-weight:400;font-variant-numeric:tabular-nums}
@@ -706,7 +709,7 @@ function wxSearch(q){if(!q)return;ui.wxRes=null;ui.wxMsg='찾는 중…';render(
   .then(j=>{ui.wxRes=(j.results||[]).map(x=>({name:[x.name,x.admin1,x.country].filter(Boolean).join(', '),lat:+x.latitude.toFixed(3),lon:+x.longitude.toFixed(3)}));ui.wxMsg=ui.wxRes.length?'':'찾지 못했어요. 영어 도시 이름으로도 해보세요 (예: Atlanta).';render()})
   .catch(()=>{ui.wxMsg='검색하지 못했어요. 인터넷 연결을 확인해 주세요.';render()})}
 function wxCard(){const w=S.settings.weather;
- return `<div class="card stack"><div class="row"><h3 class="grow">대시보드 날씨</h3>${w?wxChip():''}</div>
+ return `<div class="card stack"><h3>대시보드 날씨</h3>${w?`<div class="wxline">${wxChip()}</div>`:''}
   <p class="small muted">${w?`지역: ${esc(w.name)}`:'지역을 정하면 홈 화면 위쪽에 오늘 날씨가 나와요. 도시 이름을 찾아서 고르면 돼요.'}</p>
   ${w&&WX&&WX.err?`<div class="row notice"><span class="grow">날씨를 불러오지 못했어요: ${esc(WX.err)}</span><button class="btn ghost sm" data-act="wxretry">다시 시도</button></div>`:''}
   <form class="add" data-form="wxq"><input id="wx-q" name="q" placeholder="도시 이름 (예: 애틀랜타, Atlanta)" maxlength="40"><button class="btn">찾기</button></form>
