@@ -307,10 +307,10 @@ const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}};
 const DEV=lsGet('hafamily-dev')||(()=>{const d=newId('d');lsSet('hafamily-dev',d);return d})();
 const START_CHAT=location.hash==='#chat';
-const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},lunch:{},tlinks:{},notes:{},timers:{},shortcuts:[],events:[],rewards:[],meds:[],taken:{},took:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{},settings:{}});
+const EMPTY=()=>({faces:{mom:'🦊',dad:'🐻',eun:'🐱',yeon:'🐥'},stars:{eun:0,yeon:0},tasks:[],done:{},lunch:{},tlinks:{},notes:{},timers:{},shortcuts:[],events:[],gcal:[],rewards:[],meds:[],taken:{},took:{},growth:[],info:{mom:{},dad:{},eun:{},yeon:{}},pins:{},reads:{},settings:{}});
 function fromDoc(d){const o=EMPTY();
  for(const k of['faces','stars','done','taken','took','info','pins','reads','settings','lunch','tlinks','notes','timers'])Object.assign(o[k],d[k]||{});
- for(const k of['tasks','events','meds','growth','rewards','shortcuts'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+ for(const k of['tasks','events','meds','growth','rewards','shortcuts','gcal'])o[k]=Object.entries(d[k]||{}).map(([id,v])=>Object.assign({},v,{id,g:k==='gcal'||undefined})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
  for(const m of['mom','dad','eun','yeon'])o.info[m]=o.info[m]||{};return o}
 function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily:true,from:today}};
  add('eun','숙제하기');add('eun','책 읽기 20분');add('eun','책가방 싸기');add('eun','양치질');
@@ -319,7 +319,7 @@ function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily
 let S=EMPTY(),ready=false,syncErr='';
 function upd(o){if(!ready)return;updateDoc(REF,o).catch(err=>{syncErr='저장하지 못했어요 ('+(err.code||err.message)+'). 인터넷 연결을 확인해 주세요.';render()})}
 
-const ui={view:'loading',delR:null,timer:null,away:0,awayAt:0,linkAsk:null,noteAsk:null,scAsk:false,menu:null,delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
+const ui={view:'loading',delR:null,msg2:'',timer:null,away:0,awayAt:0,linkAsk:null,noteAsk:null,scAsk:false,menu:null,delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
 const isTablet=()=>ui.me==='tablet';
 const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||isTablet();
@@ -399,7 +399,8 @@ function occStart(e,k){const len=evLen(e),kd=dn(k),base=dn(e.date);
    else{const dim=new Date(Date.UTC(+st.slice(0,4),+st.slice(5,7),0)).getUTCDate();if(+st.slice(8,10)===Math.min(day,dim)&&!skipped(e,st))return st}}
   return null}
 function covers(e,k){if(e.yearly)return yearDates(e,+k.slice(0,4)).includes(k);return occStart(e,k)!==null}
-const occOn=k=>S.events.filter(e=>covers(e,k)).map(e=>{if(e.yearly)return{e,date:k,end:k};const st=occStart(e,k);return{e,date:st,end:fromDn(dn(st)+evLen(e))}});
+const EV=()=>S.events.concat(S.gcal);
+const occOn=k=>EV().filter(e=>covers(e,k)).map(e=>{if(e.yearly)return{e,date:k,end:k};const st=occStart(e,k);return{e,date:st,end:fromDn(dn(st)+evLen(e))}});
 function nextOcc(e){if(e.rep){const t0=dn(today),last=dn(e.until||e.date)+evLen(e);
    for(let d=Math.max(t0,dn(e.date));d<=last;d++){const st=occStart(e,fromDn(d));if(st)return{e,date:st,end:fromDn(dn(st)+evLen(e))}}return null}
   if(!e.yearly){const end=e.end||e.date;return end>=today?{e,date:e.date,end}:null}
@@ -407,11 +408,12 @@ function nextOcc(e){if(e.rep){const t0=dn(today),last=dn(e.until||e.date)+evLen(
 function evRow(o,del){const e=o.e,multi=o.end>o.date,nights=multi?Math.round((new Date(o.end+'T00:00')-new Date(o.date+'T00:00'))/864e5):0;
  const when=multi?`${nice(o.date)} ~ ${nice(o.end)} · ${nights}박 ${nights+1}일`:nice(o.date)+(e.time?' · '+esc(e.time):'');
  const chip=o.date<today&&o.end>=today?'진행 중':dday(o.date);
- return `<div class="ev">${avs(e.who)}
- <div class="grow"><div class="t">${esc(e.t)}</div><div class="small muted">${when} · ${whoName(e.who)}${e.yearly?` · 매년 ${e.yearly==='lunar'?'음력':'양력'} ${e.md[0]}월 ${e.md[1]}일`:''}${e.rep?` · ${e.rep==='week'?'매주':'매달'} 반복 (${nice(e.until)}까지)`:''}</div></div>
- <span class="chip">${chip}</span>${!del?'':e.rep?`<span class="evbtns"><button class="btn ghost sm" data-act="skipev" data-id="${e.id}" data-d="${o.date}">이 날만 빼기</button><button class="btn ghost sm" data-act="delev" data-id="${e.id}">전체 삭제</button></span>`
+ const del2=del&&!e.g;
+ return `<div class="ev">${e.g?'<span class="av all sm">📅</span>':avs(e.who)}
+ <div class="grow"><div class="t">${esc(e.t)}</div><div class="small muted">${when}${e.g?'':' · '+whoName(e.who)}${e.yearly?` · 매년 ${e.yearly==='lunar'?'음력':'양력'} ${e.md[0]}월 ${e.md[1]}일`:''}${e.rep?` · ${e.rep==='week'?'매주':'매달'} 반복 (${nice(e.until)}까지)`:''}${e.g?' · 📅 구글 캘린더':''}</div></div>
+ <span class="chip">${chip}</span>${!del2?'':e.rep?`<span class="evbtns"><button class="btn ghost sm" data-act="skipev" data-id="${e.id}" data-d="${o.date}">이 날만 빼기</button><button class="btn ghost sm" data-act="delev" data-id="${e.id}">전체 삭제</button></span>`
   :`<button class="x" data-act="delev" data-id="${e.id}" aria-label="일정 지우기">✕</button>`}</div>`}
-const upcoming=()=>S.events.map(nextOcc).filter(Boolean).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+const upcoming=()=>EV().map(nextOcc).filter(Boolean).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
 const upList=n=>upcoming().slice(0,n).map(o=>evRow(o)).join('')||'<p class="muted">다가오는 일정이 없어요.</p>';
 
 const TIMES=['아침','점심','저녁','자기 전'];
@@ -433,9 +435,9 @@ function medRow(z,showWho,del){const m=z.m,on=tookOn(z.key),can=canCheck(m.who);
 function calGrid(){
  const[y,mo]=ui.ym,first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate();
  let cells='';for(let i=0;i<first;i++)cells+='<span></span>';
- for(let d=1;d<=days;d++){const k=y+'-'+pad(mo+1)+'-'+pad(d),ev=S.events.filter(e=>covers(e,k));
+ for(let d=1;d<=days;d++){const k=y+'-'+pad(mo+1)+'-'+pad(d),ev=EV().filter(e=>covers(e,k));
   cells+=`<button class="day ${k===today?'today':''} ${k===ui.sel?'sel':''}" data-act="day" data-d="${k}" aria-label="${mo+1}월 ${d}일, 일정 ${ev.length}개">
-   ${d}<span class="pips">${ev.flatMap(e=>whoArr(e.who)).slice(0,3).map(w=>`<i class="${w}"></i>`).join('')}</span></button>`}
+   ${d}<span class="pips">${ev.flatMap(e=>e.g?['all']:whoArr(e.who)).slice(0,3).map(w=>`<i class="${w}"></i>`).join('')}</span></button>`}
  return `<div class="row"><button class="btn ghost sm" data-act="mon" data-n="-1" aria-label="이전 달">‹</button>
    <h3 class="grow" style="text-align:center">${y}년 ${mo+1}월</h3>
    <button class="btn ghost sm" data-act="mon" data-n="1" aria-label="다음 달">›</button></div>
@@ -454,6 +456,7 @@ function homeView(){
   <div class="card stack"><div class="row">${av(ui.me,'lg')}<div class="grow"><h3>${by(ui.me).name} 얼굴</h3><p class="small muted">가족 모두에게 이 얼굴로 보여요.</p></div>
    <button class="btn ghost" data-act="pickopen">얼굴 바꾸기</button></div></div>
   ${wxCard()}
+  ${gcalCard()}
  </div>
  ${facePicker()}`}
 
@@ -462,7 +465,7 @@ const safeUrl=u=>{const v=String(u||'').trim();if(!v)return'';
  if(/^https?:\/\//i.test(v))return v;
  if(/^(javascript|data|vbscript|file):/i.test(v))return'';
  return /^[\w-]+(\.[\w-]+)+/.test(v)?'https://'+v:''};
-const APPVER='2026-11-17 f';
+const APPVER='2026-11-17 g';
 const MEALVIEW='https://schools.mealviewer.com/school/SettlesBridgeElementary';
 const SEED_LINKS=[{t:'은우 학교 홈페이지',url:'https://fcss-adfs.forsyth.k12.ga.us/adfs/ls/idpinitiatedsignon.aspx?SAMLRequest=fVLBbtswDP0VQ3dLtpd0nRAnyFoMC5BiQZPusMvAybJDxKY8kQ6yvx8ct2h76ZHkw3uPj1ysLl2bnH1kDFSqXGdqtVwwdG1v14Mc6dH%2FHTxLculaYnsdlGqIZAMwsiXoPFtxdr9%2B2NpCZ7aPQYILrUo296X67fKbAvK5c85BVde3s3wOKvn5IljoTCUb5sFviAVISlVkxU2afUmz%2FJAVdjaz%2BVx%2FLma%2FVLJ7pv6KVCE1H%2Fv4M4HYfj8cdunux%2F6gknvPggRylT6K9GyNqR1zClXNug6R%2F8lRn%2FJCN6AHNmPbtGyw6pFQEMRXjA0F0sD9RSVrZh9HvrtAPHQ%2B7n08o%2FNPj9tXBfEEJGkHBI3vPEnKE0q7FphbpJPGYNrQIJnzJ50ZGOToSdCB%2BJULlS%2B%2FTd7UdBx7jSy%2BucrHYcCLTbUcYR26GDjUYscF7d3oYot0Wpg35Mupev8Hy%2F8%3D&RelayState=e30&client-request-id=3f3eaf91-a29c-4f27-235b-0080010800e8&pullStatus=0'},
  {t:'은우 학교 급식표',url:MEALVIEW}];
@@ -855,10 +858,22 @@ function loadWx(force){const w=S.settings.weather;if(!w)return;const u=w.unit===
 function wxChip(){if(!S.settings.weather)return isParent()?'<button class="wx" data-act="wxgo">🌤️ 날씨 지역 정하기</button>':'<span class="wx muted">🌤️ 날씨: 엄마·아빠 폰에서 지역을 정해 주세요</span>';if(!WX)return'<span class="wx muted">날씨 불러오는 중…</span>';if(WX.err)return'<span class="wx muted">날씨를 못 불러왔어요</span>';
  const[ic,txt]=WXC(WX.ccode!=null?WX.ccode:WX.code),r=Math.round;
  return `<span class="wx" title="${esc(S.settings.weather.name)}">${ic} ${WX.cur!=null?`<b>${r(WX.cur)}°</b> `:''}${txt} · 최고 ${r(WX.max)}° 최저 ${r(WX.min)}°${WX.pop!=null?` · ${WX.pop>=50?'☔ ':''}강수 ${WX.pop}%`:''}</span>`}
+function alertish(m){ui.msg2=m;render();setTimeout(()=>{ui.msg2='';render()},4000)}
 function wxSearch(q){if(!q)return;ui.wxRes=null;ui.wxMsg='찾는 중…';render();
  fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=ko&format=json`).then(r=>r.json())
   .then(j=>{ui.wxRes=(j.results||[]).map(x=>({name:[x.name,x.admin1,x.country].filter(Boolean).join(', '),lat:+x.latitude.toFixed(3),lon:+x.longitude.toFixed(3)}));ui.wxMsg=ui.wxRes.length?'':'찾지 못했어요. 영어 도시 이름으로도 해보세요 (예: Atlanta).';render()})
   .catch(()=>{ui.wxMsg='검색하지 못했어요. 인터넷 연결을 확인해 주세요.';render()})}
+function gcalCard(){const st=S.settings||{},n=S.gcal.length;
+ return `<div class="card stack"><h3>구글 캘린더 가져오기</h3>
+  ${st.gcalUrl?`<p class="small muted">연결됨 · 일정 ${n}개${st.gcalAt?` · 마지막 확인 ${nice(ds(new Date(st.gcalAt)))} ${hm(st.gcalAt)}`:''}</p>`
+   :'<p class="small muted">구글 캘린더의 <b>비공개 주소(iCal 형식)</b>를 넣으면, 거기 있는 일정이 우리 앱 달력에도 나와요. 한 시간마다 자동으로 확인해요.</p>'}
+  ${st.gcalErr?`<div class="row notice"><span class="grow">${esc(st.gcalErr)}</span></div>`:''}
+  <form class="add" data-form="gcal" style="grid-template-columns:1fr">
+   <input id="gc-u" name="url" type="text" inputmode="url" autocomplete="off" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" value="${esc(st.gcalUrl||'')}">
+   <div class="row"><button class="btn">${st.gcalUrl?'주소 바꾸기':'연결하기'}</button>
+    ${st.gcalUrl?`<button class="btn ghost" type="button" data-act="gcalnow">지금 가져오기</button>
+     <button class="btn ghost" type="button" data-act="gcaloff">연결 끊기</button>`:''}</div></form>
+  <p class="small muted">구글 캘린더 → 왼쪽에서 캘린더 선택 → 설정 → "비공개 주소(iCal 형식)"를 복사해 주세요. 앱에서 넣은 일정은 구글로 가지 않아요.</p></div>`}
 function wxCard(){const w=S.settings.weather;
  return `<div class="card stack"><h3>대시보드 날씨</h3>${w?`<div class="wxline">${wxChip()}</div>`:''}
   <p class="small muted">${w?`지역: ${esc(w.name)}`:'지역을 정하면 홈 화면 위쪽에 오늘 날씨가 나와요. 도시 이름을 찾아서 고르면 돼요.'}</p>
@@ -882,7 +897,7 @@ function mainView(){const tabs=[['home',isTablet()?'대시보드':'홈'],['cal',
   <button class="me" data-act="switch" aria-label="사용자 바꾸기">${av(isTablet()?'eun':ui.me,'sm')}<b>${name}</b><span class="small muted">바꾸기</span></button></div>
  <div class="tabs" role="tablist">${tabs.map(([k,n])=>`<button class="tab" role="tab" aria-selected="${ui.tab===k}" data-act="tab" data-t="${k}">${n}</button>`).join('')}</div>
  ${ui.timer?timerView():ui.tab==='home'?(isTablet()?dashView():homeView()):ui.tab==='cal'?calView():ui.tab==='todo'?todoView():ui.tab==='health'?healthView():ui.tab==='reward'?rewardView():chatView()}
- ${syncErr?`<p class="notice">${esc(syncErr)}</p>`:''}
+ ${syncErr?`<p class="notice">${esc(syncErr)}</p>`:''}${ui.msg2?`<p class="notice">${esc(ui.msg2)}</p>`:''}
  ${isParent()?`<div class="row"><span class="grow small muted">${lsGet('hafamily-me')===ui.me?'이 기기는 '+by(ui.me).name+'로 기억하고 있어요. 그만하려면 위쪽 \'바꾸기\'를 누르세요.':''}</span><button class="btn ghost sm" data-act="pinreset">내 비밀번호 바꾸기</button></div>`:''}
  <p class="small muted" style="text-align:center">앱 버전 ${APPVER}</p>`}
 
@@ -956,6 +971,8 @@ app.addEventListener('click',e=>{
  else if(a==='give'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r)&&!usedOn(r)&&r.cost>0&&(S.stars[r.who]||0)>=r.cost){ui.giveAsk=id;ui.delR=null}}
  else if(a==='wxgo'){ui.tab='home';render();const el=document.getElementById('wx-q');if(el){if(el.scrollIntoView)el.scrollIntoView({block:'center'});el.focus()}return}
  else if(a==='wxretry'){WX=null;loadWx(true)}
+ else if(a==='gcalnow'&&isParent()){upd({'settings.gcalPing':Date.now(),'settings.gcalErr':''})}
+ else if(a==='gcaloff'&&isParent()){upd({'settings.gcalUrl':'','settings.gcalErr':'',gcal:{}})}
  else if(a==='lunch'&&LUNCH.includes(id)){const d=b.dataset.d;upd({['lunch.'+d+'.'+id]:lunchOn(d,id)?deleteField():true})}
  else if(a==='wxpick'&&isParent()){const x=(ui.wxRes||[])[+b.dataset.i];if(x){upd({['settings.weather']:{name:x.name,lat:x.lat,lon:x.lon,unit:(S.settings.weather&&S.settings.weather.unit)||'F'}});ui.wxRes=null;ui.wxMsg='';WX=null;wxKey=''}}
  else if(a==='wxunit'&&isParent()&&S.settings.weather){upd({['settings.weather.unit']:b.dataset.u});WX=null;wxKey=''}
@@ -964,7 +981,7 @@ app.addEventListener('click',e=>{
  else if(a==='delreward1'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r))upd({['rewards.'+id]:deleteField()});ui.delR=null}
  else if(a==='delmed'&&isParent()){upd({['meds.'+id]:deleteField()})}
  else if(a==='delgrow'&&isParent()){upd({['growth.'+id]:deleteField()})}
- else if(a==='delev'){const ev=S.events.find(x=>x.id===id);if(ev&&(ev.yearly?isParent():canEv()))upd({['events.'+id]:deleteField()})}
+ else if(a==='delev'){const ev=S.events.find(x=>x.id===id);if(ev&&!ev.g&&(ev.yearly?isParent():canEv()))upd({['events.'+id]:deleteField()})}
  else if(a==='day'){ui.sel=b.dataset.d;if(ui.tab==='home')ui.tab='cal'}
  else if(a==='mon'){const d=new Date(ui.ym[0],ui.ym[1]+(+b.dataset.n),1);ui.ym=[d.getFullYear(),d.getMonth()]}
  else if(a==='hp'){ui.hp=id}
@@ -1004,6 +1021,9 @@ app.addEventListener('submit',e=>{
   upd({['rewards.'+newId('r')]:{who,t:v('t'),cost:null,by:isTablet()?'eun':ui.me}});render();return}
  if(k==='rcost'){if(!isParent())return;const c=parseInt(v('cost'),10);upd({['rewards.'+f.dataset.id+'.cost']:c>0?c:null});render();return}
  if(k==='wxq'){if(!isParent())return;wxSearch(v('q'));return}
+ if(k==='gcal'){if(!isParent())return;let u=v('url').replace(/^webcal:\/\//i,'https://');
+  if(u&&!/^https:\/\//i.test(u)){alertish('주소가 https로 시작해야 해요.');return}
+  upd({'settings.gcalUrl':u,'settings.gcalErr':'','settings.gcalPing':Date.now()});render();return}
  const jump=date=>{ui.sel=date;const d=new Date(date+'T00:00');ui.ym=[d.getFullYear(),d.getMonth()]};
  if(k==='event'){if(!canEv()||!v('t')||!v('date'))return;const date=v('date'),end=v('end');
   const ws=chk('w'),pp=ws.filter(x=>x!=='all');

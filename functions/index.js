@@ -1,12 +1,16 @@
 // 가족방에 새 메시지가 올라오면, 보낸 사람과 보낸 기기를 뺀 가족 기기에 알림을 보내요.
-const {onDocumentCreated} = require('firebase-functions/v2/firestore');
+// 그리고 구글 캘린더(iCal 주소)를 한 시간마다 읽어서 앱 일정으로 가져와요.
+const {onDocumentCreated, onDocumentUpdated} = require('firebase-functions/v2/firestore');
+const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {initializeApp} = require('firebase-admin/app');
-const {getFirestore} = require('firebase-admin/firestore');
+const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
+const {parseICS} = require('./ical');
 
 initializeApp();
 const APP_URL = 'https://yonyjj.github.io/hafamily/';
 const NAMES = {mom: '엄마', dad: '아빠', eun: '은우', yeon: '연우'};
+const FAMILY = 'families/main';
 
 exports.notifyFamily = onDocumentCreated('families/main/messages/{id}', async (event) => {
   const m = event.data && event.data.data();
@@ -29,4 +33,56 @@ exports.notifyFamily = onDocumentCreated('families/main/messages/{id}', async (e
     if (!r.success && /registration-token-not-registered|invalid-registration-token/.test(code)) stale.push(targets[i].ref.delete());
   });
   await Promise.all(stale);
+});
+
+/* ---------- 구글 캘린더 가져오기 ---------- */
+async function syncCalendar() {
+  const db = getFirestore();
+  const ref = db.doc(FAMILY);
+  const snap = await ref.get();
+  const settings = (snap.exists && snap.get('settings')) || {};
+  let url = String(settings.gcalUrl || '').trim();
+  if (!url) return {skipped: 'no url'};
+  if (/^webcal:\/\//i.test(url)) url = 'https://' + url.slice(9);
+  if (!/^https:\/\//i.test(url)) {
+    await ref.update({'settings.gcalErr': '주소가 https로 시작해야 해요.', 'settings.gcalAt': Date.now()});
+    return {error: 'bad url'};
+  }
+  const tz = settings.tz || 'America/New_York';
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 25000);
+    const res = await fetch(url, {signal: ctl.signal, redirect: 'follow'});
+    clearTimeout(timer);
+    if (!res.ok) throw new Error('캘린더 주소에서 ' + res.status + ' 응답이 왔어요');
+    const text = await res.text();
+    if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('캘린더 파일이 아니에요. 비공개 주소(iCal 형식)인지 확인해 주세요');
+    const items = parseICS(text, {tz, now: Date.now(), backDays: 7, forwardDays: 120});
+    const gcal = {};
+    items.forEach((x, i) => {
+      const o = {date: x.date, t: String(x.t).slice(0, 60), who: 'all'};
+      if (x.end) o.end = x.end;
+      if (x.time) o.time = x.time;
+      gcal['g' + i] = o;
+    });
+    await ref.update({gcal, 'settings.gcalAt': Date.now(), 'settings.gcalErr': '', 'settings.gcalCount': items.length});
+    return {count: items.length};
+  } catch (e) {
+    const msg = e && e.name === 'AbortError' ? '캘린더를 불러오는 데 너무 오래 걸렸어요' : (e && e.message) || String(e);
+    await ref.update({'settings.gcalErr': String(msg).slice(0, 200), 'settings.gcalAt': Date.now()});
+    return {error: msg};
+  }
+}
+
+// 한 시간마다 자동으로
+exports.syncCalendarHourly = onSchedule({schedule: 'every 60 minutes', timeZone: 'America/New_York'}, async () => {
+  await syncCalendar();
+});
+
+// 앱에서 "지금 가져오기"를 누르면 (settings.gcalPing 이 바뀔 때만)
+exports.syncCalendarOnPing = onDocumentUpdated('families/main', async (event) => {
+  const before = event.data.before.get('settings') || {};
+  const after = event.data.after.get('settings') || {};
+  if (before.gcalPing === after.gcalPing && before.gcalUrl === after.gcalUrl) return;
+  await syncCalendar();
 });
