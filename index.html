@@ -219,6 +219,8 @@ form.add .chips input[type="checkbox"]{position:absolute;opacity:0;width:1px;hei
 .lbox.on{background:var(--ok);border-color:var(--ok)}
 td.now .lbox:not(.on){border-color:var(--accent)}
 .fitpage .lbox{height:38px}
+.tmbtn.on{background:var(--ok)}
+@media (max-width:620px){.tmbtn .lb{display:none}.tmbtn{padding:6px 10px;font-size:17px}}
 @media (max-width:560px){.taskrow{gap:6px}.tacts{gap:6px}.taskrow>.task{flex:1 1 150px}.task>.chip{font-size:11px;padding:3px 8px}.task .t{font-size:17px}.tbtn,.x{width:30px;height:30px}.taskrow>.open{order:9;margin-left:0}}
 @media (max-width:480px){.wx{white-space:normal;font-size:15px}.lunch col.lname{width:78px}.lunch tbody th div{font-size:15px;gap:4px}}
 .links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -300,7 +302,7 @@ const fbApp=initializeApp(FB),auth=getAuth(fbApp);
 let fdb;try{fdb=initializeFirestore(fbApp,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){fdb=initializeFirestore(fbApp,{})}
 const REF=doc(fdb,'families','main');
 const MSGS=fsCollection(fdb,'families','main','messages');
-let MSG=[];
+let MSG=[],chatErr='',msgFallback=false;
 const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}};
 const DEV=lsGet('hafamily-dev')||(()=>{const d=newId('d');lsSet('hafamily-dev',d);return d})();
@@ -460,6 +462,7 @@ const safeUrl=u=>{const v=String(u||'').trim();if(!v)return'';
  if(/^https?:\/\//i.test(v))return v;
  if(/^(javascript|data|vbscript|file):/i.test(v))return'';
  return /^[\w-]+(\.[\w-]+)+/.test(v)?'https://'+v:''};
+const APPVER='2026-11-17 f';
 const MEALVIEW='https://schools.mealviewer.com/school/SettlesBridgeElementary';
 const SEED_LINKS=[{t:'은우 학교 홈페이지',url:'https://fcss-adfs.forsyth.k12.ga.us/adfs/ls/idpinitiatedsignon.aspx?SAMLRequest=fVLBbtswDP0VQ3dLtpd0nRAnyFoMC5BiQZPusMvAybJDxKY8kQ6yvx8ct2h76ZHkw3uPj1ysLl2bnH1kDFSqXGdqtVwwdG1v14Mc6dH%2FHTxLculaYnsdlGqIZAMwsiXoPFtxdr9%2B2NpCZ7aPQYILrUo296X67fKbAvK5c85BVde3s3wOKvn5IljoTCUb5sFviAVISlVkxU2afUmz%2FJAVdjaz%2BVx%2FLma%2FVLJ7pv6KVCE1H%2Fv4M4HYfj8cdunux%2F6gknvPggRylT6K9GyNqR1zClXNug6R%2F8lRn%2FJCN6AHNmPbtGyw6pFQEMRXjA0F0sD9RSVrZh9HvrtAPHQ%2B7n08o%2FNPj9tXBfEEJGkHBI3vPEnKE0q7FphbpJPGYNrQIJnzJ50ZGOToSdCB%2BJULlS%2B%2FTd7UdBx7jSy%2BucrHYcCLTbUcYR26GDjUYscF7d3oYot0Wpg35Mupev8Hy%2F8%3D&RelayState=e30&client-request-id=3f3eaf91-a29c-4f27-235b-0080010800e8&pullStatus=0'},
  {t:'은우 학교 급식표',url:MEALVIEW}];
@@ -626,18 +629,19 @@ function todoView(){
   return `<div class="card stack"><div class="row">${av(id)}<span class="d grow" style="font-size:22px">${m.name}</span>
     ${m.role==='child'?`<span class="chip">⭐ ${S.stars[id]}</span>`:''}<span class="chip">${a}/${b}</span></div>
    ${l.map(t=>{const on=isDone(t,d),lk=tLink(t,d),nt=tNote(t,d);return `<div class="taskrow"><button class="task ${on?'done':''}" data-act="toggle" data-id="${t.id}" data-d="${d}" ${can?'':'disabled'} aria-pressed="${on}">
-     <span class="box">✓</span><span class="t grow">${esc(t.t)}</span>${t.daily?`<span class="chip">${repLabel(t)}</span>`:''}</button>
+     <span class="box">✓</span><span class="t grow">${esc(t.t)}</span>${t.daily&&repLabel(t)!=='매일'?`<span class="chip">${repLabel(t)}</span>`:''}</button>
      ${lk?`<a class="open" href="${esc(lk)}" target="_blank" rel="noopener noreferrer">▶ 열기</a>`:''}
-     ${can&&d===today?`<button class="open" data-act="tmgo" data-id="${t.id}">${tm(t.id,d)&&tm(t.id,d).start?'⏱ 공부 중':'⏱ 시작'}</button>`:''}
+     ${can&&d===today?`<button class="open tmbtn ${tm(t.id,d)&&tm(t.id,d).start?'on':''}" data-act="tmgo" data-id="${t.id}" aria-label="${esc(t.t)} 공부 타이머">⏱<span class="lb"> ${tm(t.id,d)&&tm(t.id,d).start?'공부 중':'시작'}</span></button>`:''}
      ${can||isParent()?`<span class="tacts">${can||isParent()?`<button class="tbtn" data-act="note" data-id="${t.id}" aria-label="${esc(t.t)} 메모·링크">✎</button>`:''}
       ${isParent()?`<button class="x" data-act="deltask" data-id="${t.id}" aria-label="할 일 지우기">✕</button>`:''}</span>`:''}</div>
      ${timerSummary(t.id,d)?`<span class="timed">${timerSummary(t.id,d)}</span>`:''}
      ${nt?`<span class="note">✎ <b>${esc(nt)}</b></span>`:''}
      ${ui.noteAsk===t.id?`<div class="ask"><form data-form="tnote" data-id="${t.id}" data-d="${d}">
       ${canDo(t.who,d)?`<input id="nt-${t.id}" name="t" placeholder="메모 (예: 마당을 나온 암탉 3장)" maxlength="60" value="${esc(nt)}">`:''}
-      ${isParent()?`<input id="lk-${t.id}" name="url" type="text" inputmode="url" autocomplete="off" placeholder="링크 (예: youtu.be/abc)" value="${esc(lk)}">
-      ${lk?`<button class="btn ghost sm" type="button" data-act="unlink" data-id="${t.id}" data-d="${d}">링크 지우기</button>`:''}`:''}
-      <button class="btn sm">저장</button><button class="btn ghost sm" type="button" data-act="delno">닫기</button></form></div>`:''}
+      ${isParent()?(lk||ui.linkAsk===t.id?`<input id="lk-${t.id}" name="url" type="text" inputmode="url" autocomplete="off" placeholder="링크 (예: youtu.be/abc)" value="${esc(lk)}">`
+       :`<button class="btn ghost sm" type="button" data-act="linkadd" data-id="${t.id}">+ 링크 넣기</button>`):''}
+      <button class="btn sm">저장</button>${isParent()&&lk?`<button class="btn ghost sm" type="button" data-act="unlink" data-id="${t.id}" data-d="${d}">링크 지우기</button>`:''}
+      <button class="btn ghost sm" type="button" data-act="delno">닫기</button></form></div>`:''}
      ${ui.delAsk===t.id?`<div class="ask"><span>${isToday?'오늘':nice(d)+'요일'}만 삭제할까요?</span><button class="btn sm" data-act="deltask1" data-id="${t.id}" data-d="${d}">네</button>
       <button class="btn ghost sm" data-act="deltaskall" data-id="${t.id}">${isToday?'오늘':'이 날'}부터 모두</button><button class="btn ghost sm" data-act="delno">취소</button></div>`:''}`}).join('')||'<p class="muted">할 일이 없어요.</p>'}
    <p class="small muted">최근 7일 (한 일/할 일)</p>${week(id)}
@@ -801,6 +805,8 @@ function chatView(){
  const quick=by(me).role==='parent'?QUICK_PARENT:QUICK_KID;
  return `<div class="card stack chat">
   <div class="row"><h3 class="grow">우리가족 방</h3><span class="muted">${M.map(m=>S.faces[m.id]).join(' ')}</span></div>
+  ${chatErr?`<div class="row notice"><span class="grow">${esc(chatErr)}</span><button class="btn ghost sm" data-act="msgretry">다시 불러오기</button></div>`
+   :!MSG.length?`<div class="row notice"><span class="grow small">메시지가 하나도 안 보이면 눌러 보세요.</span><button class="btn ghost sm" data-act="msgretry">다시 불러오기</button></div>`:''}
   ${pushCard()}
   <div class="msgs" id="msgs">${bubbles||'<p class="muted" style="text-align:center;margin:auto">아직 메시지가 없어요. 첫 인사를 보내 보세요!</p>'}</div>
   ${target?`<div class="row notice"><span class="grow">${nameOf(target.from)}의 "${esc(target.text.slice(0,30))}"에 답장</span><button class="x" data-act="replyx" aria-label="답장 취소">✕</button></div>`:''}
@@ -877,7 +883,8 @@ function mainView(){const tabs=[['home',isTablet()?'대시보드':'홈'],['cal',
  <div class="tabs" role="tablist">${tabs.map(([k,n])=>`<button class="tab" role="tab" aria-selected="${ui.tab===k}" data-act="tab" data-t="${k}">${n}</button>`).join('')}</div>
  ${ui.timer?timerView():ui.tab==='home'?(isTablet()?dashView():homeView()):ui.tab==='cal'?calView():ui.tab==='todo'?todoView():ui.tab==='health'?healthView():ui.tab==='reward'?rewardView():chatView()}
  ${syncErr?`<p class="notice">${esc(syncErr)}</p>`:''}
- ${isParent()?`<div class="row"><span class="grow small muted">${lsGet('hafamily-me')===ui.me?'이 기기는 '+by(ui.me).name+'로 기억하고 있어요. 그만하려면 위쪽 \'바꾸기\'를 누르세요.':''}</span><button class="btn ghost sm" data-act="pinreset">내 비밀번호 바꾸기</button></div>`:''}`}
+ ${isParent()?`<div class="row"><span class="grow small muted">${lsGet('hafamily-me')===ui.me?'이 기기는 '+by(ui.me).name+'로 기억하고 있어요. 그만하려면 위쪽 \'바꾸기\'를 누르세요.':''}</span><button class="btn ghost sm" data-act="pinreset">내 비밀번호 바꾸기</button></div>`:''}
+ <p class="small muted" style="text-align:center">앱 버전 ${APPVER}</p>`}
 
 const app=document.getElementById('app');
 /* 다른 기기에서 바뀐 내용으로 다시 그릴 때, 입력 중이던 칸은 그대로 둠 */
@@ -925,6 +932,7 @@ app.addEventListener('click',e=>{
  else if(a==='quick'){sendMsg(b.dataset.t,true)}
  else if(a==='replyto'){const m=MSG.find(x=>x.id===id);if(m&&m.from!==sender())ui.replyTo=id}
  else if(a==='replyx'){ui.replyTo=null}
+ else if(a==='msgretry'){chatErr='';msgFallback=!msgFallback;listenMsgs();ui.scrollEnd=true}
  else if(a==='pushon'){enablePush();return}
  else if(a==='pushoff'){disablePush();return}
  else if(a==='tsend'&&isTablet()){ui.tsend=id;ui.replyTo=null}
@@ -940,9 +948,10 @@ app.addEventListener('click',e=>{
  else if(a==='tmstart'){const t=S.tasks.find(x=>x.id===id);if(t&&canDo(t.who,today)){ui.away=0;timerStart(id)}}
  else if(a==='tmstop'){const t=S.tasks.find(x=>x.id===id);if(t&&canDo(t.who,today))timerStop(id)}
  else if(a==='tmdone'){const t=S.tasks.find(x=>x.id===id);if(t&&canDo(t.who,today))timerDone(id)}
- else if(a==='note'){const t=S.tasks.find(x=>x.id===id);if(t&&(canDo(t.who,ui.td)||isParent()))ui.noteAsk=ui.noteAsk===id?null:id}
+ else if(a==='note'){const t=S.tasks.find(x=>x.id===id);if(t&&(canDo(t.who,ui.td)||isParent())){ui.noteAsk=ui.noteAsk===id?null:id;ui.linkAsk=null}}
  else if(a==='scadd'&&isParent()){ui.scAsk=!ui.scAsk}
- else if(a==='unlink'&&isParent()){upd({['tlinks.'+b.dataset.d+'.'+id]:deleteField()});ui.noteAsk=null}
+ else if(a==='unlink'&&isParent()){upd({['tlinks.'+b.dataset.d+'.'+id]:deleteField()});ui.linkAsk=null;ui.noteAsk=null}
+ else if(a==='linkadd'&&isParent()){ui.linkAsk=id}
  else if(a==='delsc'&&isParent()){upd({['shortcuts.'+id]:deleteField()})}
  else if(a==='give'){const r=S.rewards.find(x=>x.id===id);if(r&&canR(r)&&!usedOn(r)&&r.cost>0&&(S.stars[r.who]||0)>=r.cost){ui.giveAsk=id;ui.delR=null}}
  else if(a==='wxgo'){ui.tab='home';render();const el=document.getElementById('wx-q');if(el){if(el.scrollIntoView)el.scrollIntoView({block:'center'});el.focus()}return}
@@ -1042,14 +1051,23 @@ onAuthStateChanged(auth,user=>{
    const r=remembered();if(r)enter(r);else ui.view='who';render();return}
   render(true)},
  err=>{syncErr=err.code==='permission-denied'?'이 계정으로는 가족 데이터를 볼 수 없어요. Firestore 보안 규칙에 적은 이메일과 로그인한 이메일이 같은지 확인해 주세요.':'연결하지 못했어요 ('+err.code+')';render()});
- unsubM=onSnapshot(fsQuery(MSGS,fsOrderBy('ts','desc'),fsLimit(100)),snap=>{
+ listenMsgs()});
+/* 메시지 듣기: 시간순 정렬이 막히면 정렬 없이 다시 시도 */
+function listenMsgs(){
+ if(unsubM){unsubM();unsubM=null}
+ const q=msgFallback?fsQuery(MSGS,fsLimit(300)):fsQuery(MSGS,fsOrderBy('ts','desc'),fsLimit(100));
+ unsubM=onSnapshot(q,snap=>{
   MSG=snap.docs.map(d=>{const x=d.data({serverTimestamps:'estimate'})||{};const t=x.ts&&x.ts.toMillis?x.ts.toMillis():Date.now();
-   return{id:d.id,from:x.from,text:String(x.text||''),quick:!!x.quick,reply:x.reply||null,ts:t}}).filter(m=>by(m.from)).reverse();
+   return{id:d.id,from:x.from,text:String(x.text||''),quick:!!x.quick,reply:x.reply||null,ts:t}}).filter(m=>by(m.from));
+  MSG=msgFallback?MSG.sort((a,b)=>a.ts-b.ts):MSG.reverse();
+  chatErr='';
   const ids=new Set(MSG.map(m=>m.id));
   if(knownMsg&&ui.view==='main'&&MSG.some(m=>!knownMsg.has(m.id)&&m.from!==sender()))ding();
   knownMsg=ids;render(true)},
- err=>{if(err.code==='permission-denied')syncErr='메시지를 볼 수 없어요. Firestore 보안 규칙을 새 규칙으로 바꿔 주세요.';else syncErr='메시지를 불러오지 못했어요 ('+err.code+')';render()});
-});
+ err=>{
+  if(!msgFallback&&err.code!=='permission-denied'){msgFallback=true;listenMsgs();return}
+  chatErr=err.code==='permission-denied'?'메시지를 볼 수 없어요. Firestore 보안 규칙에 messages 부분이 들어갔는지 확인해 주세요.':'메시지를 불러오지 못했어요 ('+(err.code||err.message)+')';
+  render()})}
 render();
 })();
 </script>
