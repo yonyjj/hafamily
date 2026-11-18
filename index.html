@@ -48,7 +48,7 @@ button{cursor:pointer;border:0;background:none}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .muted{color:var(--muted)} .small{font-size:13px}
 
-.card{background:var(--surface);border-radius:var(--r);padding:20px;min-width:0}
+.card{background:var(--surface);border-radius:var(--r);padding:20px;min-width:0;container-type:inline-size}
 .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .grow{flex:1;min-width:0}
 .stack{display:flex;flex-direction:column;gap:12px}
@@ -221,6 +221,9 @@ td.now .lbox:not(.on){border-color:var(--accent)}
 .fitpage .lbox{height:38px}
 .tmbtn.on{background:var(--ok)}
 @media (max-width:620px){.tmbtn .lb{display:none}.tmbtn{padding:6px 10px;font-size:17px}}
+@container (max-width:560px){.tmbtn .lb{display:none}.tmbtn{padding:6px 10px;font-size:17px}
+ .taskrow{gap:6px}.tacts{gap:6px}.taskrow>.task{flex:1 1 150px}.task>.chip{font-size:11px;padding:3px 8px}.task .t{font-size:17px}
+ .tbtn,.x{width:30px;height:30px}.taskrow>.open{order:9;margin-left:0}}
 @media (max-width:560px){.taskrow{gap:6px}.tacts{gap:6px}.taskrow>.task{flex:1 1 150px}.task>.chip{font-size:11px;padding:3px 8px}.task .t{font-size:17px}.tbtn,.x{width:30px;height:30px}.taskrow>.open{order:9;margin-left:0}}
 @media (max-width:480px){.wx{white-space:normal;font-size:15px}.lunch col.lname{width:78px}.lunch tbody th div{font-size:15px;gap:4px}}
 .links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -465,7 +468,7 @@ const safeUrl=u=>{const v=String(u||'').trim();if(!v)return'';
  if(/^https?:\/\//i.test(v))return v;
  if(/^(javascript|data|vbscript|file):/i.test(v))return'';
  return /^[\w-]+(\.[\w-]+)+/.test(v)?'https://'+v:''};
-const APPVER='2026-11-17 g';
+const APPVER='2026-11-18 h';
 const MEALVIEW='https://schools.mealviewer.com/school/SettlesBridgeElementary';
 const SEED_LINKS=[{t:'은우 학교 홈페이지',url:'https://fcss-adfs.forsyth.k12.ga.us/adfs/ls/idpinitiatedsignon.aspx?SAMLRequest=fVLBbtswDP0VQ3dLtpd0nRAnyFoMC5BiQZPusMvAybJDxKY8kQ6yvx8ct2h76ZHkw3uPj1ysLl2bnH1kDFSqXGdqtVwwdG1v14Mc6dH%2FHTxLculaYnsdlGqIZAMwsiXoPFtxdr9%2B2NpCZ7aPQYILrUo296X67fKbAvK5c85BVde3s3wOKvn5IljoTCUb5sFviAVISlVkxU2afUmz%2FJAVdjaz%2BVx%2FLma%2FVLJ7pv6KVCE1H%2Fv4M4HYfj8cdunux%2F6gknvPggRylT6K9GyNqR1zClXNug6R%2F8lRn%2FJCN6AHNmPbtGyw6pFQEMRXjA0F0sD9RSVrZh9HvrtAPHQ%2B7n08o%2FNPj9tXBfEEJGkHBI3vPEnKE0q7FphbpJPGYNrQIJnzJ50ZGOToSdCB%2BJULlS%2B%2FTd7UdBx7jSy%2BucrHYcCLTbUcYR26GDjUYscF7d3oYot0Wpg35Mupev8Hy%2F8%3D&RelayState=e30&client-request-id=3f3eaf91-a29c-4f27-235b-0080010800e8&pullStatus=0'},
  {t:'은우 학교 급식표',url:MEALVIEW}];
@@ -642,7 +645,7 @@ function todoView(){
      ${ui.noteAsk===t.id?`<div class="ask"><form data-form="tnote" data-id="${t.id}" data-d="${d}">
       ${canDo(t.who,d)?`<input id="nt-${t.id}" name="t" placeholder="메모 (예: 마당을 나온 암탉 3장)" maxlength="60" value="${esc(nt)}">`:''}
       ${isParent()?(lk||ui.linkAsk===t.id?`<input id="lk-${t.id}" name="url" type="text" inputmode="url" autocomplete="off" placeholder="링크 (예: youtu.be/abc)" value="${esc(lk)}">`
-       :`<button class="btn ghost sm" type="button" data-act="linkadd" data-id="${t.id}">+ 링크 넣기</button>`):''}
+       :`<button class="btn ghost sm" type="button" data-act="linkadd" data-id="${t.id}">+ 링크 넣기</button>`):(lk?'<span class="small muted">링크는 엄마·아빠만 바꿀 수 있어요</span>':'')}
       <button class="btn sm">저장</button>${isParent()&&lk?`<button class="btn ghost sm" type="button" data-act="unlink" data-id="${t.id}" data-d="${d}">링크 지우기</button>`:''}
       <button class="btn ghost sm" type="button" data-act="delno">닫기</button></form></div>`:''}
      ${ui.delAsk===t.id?`<div class="ask"><span>${isToday?'오늘':nice(d)+'요일'}만 삭제할까요?</span><button class="btn sm" data-act="deltask1" data-id="${t.id}" data-d="${d}">네</button>
