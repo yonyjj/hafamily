@@ -6,11 +6,15 @@ const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {parseICS} = require('./ical');
+const {weeklyText} = require('./report');
 
 initializeApp();
 const APP_URL = 'https://yonyjj.github.io/hafamily/';
 const NAMES = {mom: '엄마', dad: '아빠', eun: '은우', yeon: '연우'};
 const FAMILY = 'families/main';
+
+const TZ = 'America/New_York';
+const todayIn = (tz) => new Intl.DateTimeFormat('en-CA', {timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
 
 exports.notifyFamily = onDocumentCreated('families/main/messages/{id}', async (event) => {
   const m = event.data && event.data.data();
@@ -85,4 +89,18 @@ exports.syncCalendarOnPing = onDocumentUpdated('families/main', async (event) =>
   const after = event.data.after.get('settings') || {};
   if (before.gcalPing === after.gcalPing && before.gcalUrl === after.gcalUrl) return;
   await syncCalendar();
+});
+
+/* ---------- 일요일 밤, 이번 주 기록을 가족방에 ---------- */
+exports.weeklyReport = onSchedule({schedule: '0 20 * * 0', timeZone: TZ}, async () => {
+  const db = getFirestore();
+  const snap = await db.doc(FAMILY).get();
+  if (!snap.exists) return;
+  const data = snap.data() || {};
+  if ((data.settings || {}).weeklyReport === false) return;
+  const text = weeklyText(data, todayIn((data.settings || {}).tz || TZ), ['eun', 'yeon']);
+  if (!text) return;
+  await db.collection('families/main/messages').add({
+    from: 'report', text, quick: false, dev: 'server', ts: FieldValue.serverTimestamp(),
+  });
 });

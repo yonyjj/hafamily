@@ -240,6 +240,8 @@ a.link:hover{border-color:var(--accent)}
 .note{display:block;font-size:13px;color:var(--muted);padding:2px 0 0 42px;overflow-wrap:anywhere}
 .note b{font-weight:500;color:var(--ink)}
 .tbtn{width:32px;height:32px;border-radius:50%;background:var(--sunk);flex:none;font-size:15px}
+.card>label.check{display:flex;align-items:center;gap:8px;font-size:15px}
+.card>label.check input{width:22px;height:22px;accent-color:var(--accent);flex:none}
 .ask input{flex:1 1 150px;min-width:0;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:8px 12px}
 .ask form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;flex:1 1 220px}
 .tm{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding-block:10px}
@@ -358,7 +360,7 @@ const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||isTablet();
 const canCheck=who=>isParent()||isTablet()||who===ui.me;
 const canDo=(who,d)=>canCheck(who)&&(isParent()?d<=today:d===today);
-const av=(id,c='')=>id==='all'?`<span class="av all ${c}">🏠</span>`:id==='tablet'?`<span class="av tablet ${c}">📺</span>`:`<span class="av ${id} ${c}">${S.faces[id]}</span>`;
+const av=(id,c='')=>id==='all'?`<span class="av all ${c}">🏠</span>`:id==='tablet'?`<span class="av tablet ${c}">📺</span>`:id==='report'?`<span class="av all ${c}">📊</span>`:`<span class="av ${id} ${c}">${S.faces[id]}</span>`;
 const whoArr=w=>w==='all'?['all']:Array.isArray(w)?w:[w];
 const whoName=w=>whoArr(w).map(x=>x==='all'?'가족 모두':by(x)?by(x).name:'').join('·');
 const avs=w=>{const a=whoArr(w);return a.length>1?`<span class="avs">${a.map(i=>av(i,'sm')).join('')}</span>`:av(a[0])};
@@ -498,7 +500,7 @@ const safeUrl=u=>{const v=String(u||'').trim();if(!v)return'';
  if(/^https?:\/\//i.test(v))return v;
  if(/^(javascript|data|vbscript|file):/i.test(v))return'';
  return /^[\w-]+(\.[\w-]+)+/.test(v)?'https://'+v:''};
-const APPVER='2026-11-20 i';
+const APPVER='2026-11-20 j';
 const MEALVIEW='https://schools.mealviewer.com/school/SettlesBridgeElementary';
 const SEED_LINKS=[{t:'은우 학교 홈페이지',url:'https://fcss-adfs.forsyth.k12.ga.us/adfs/ls/idpinitiatedsignon.aspx?SAMLRequest=fVLBbtswDP0VQ3dLtpd0nRAnyFoMC5BiQZPusMvAybJDxKY8kQ6yvx8ct2h76ZHkw3uPj1ysLl2bnH1kDFSqXGdqtVwwdG1v14Mc6dH%2FHTxLculaYnsdlGqIZAMwsiXoPFtxdr9%2B2NpCZ7aPQYILrUo296X67fKbAvK5c85BVde3s3wOKvn5IljoTCUb5sFviAVISlVkxU2afUmz%2FJAVdjaz%2BVx%2FLma%2FVLJ7pv6KVCE1H%2Fv4M4HYfj8cdunux%2F6gknvPggRylT6K9GyNqR1zClXNug6R%2F8lRn%2FJCN6AHNmPbtGyw6pFQEMRXjA0F0sD9RSVrZh9HvrtAPHQ%2B7n08o%2FNPj9tXBfEEJGkHBI3vPEnKE0q7FphbpJPGYNrQIJnzJ50ZGOToSdCB%2BJULlS%2B%2FTd7UdBx7jSy%2BucrHYcCLTbUcYR26GDjUYscF7d3oYot0Wpg35Mupev8Hy%2F8%3D&RelayState=e30&client-request-id=3f3eaf91-a29c-4f27-235b-0080010800e8&pullStatus=0'},
  {t:'은우 학교 급식표',url:MEALVIEW}];
@@ -681,7 +683,8 @@ function weekReport(){const who=ui.rwho,start=ui.wk||monStart(today),days=[0,1,2
    <tr><th scope="row" class="small muted" style="font-family:var(--body)">하루 합계</th>${days.map(k=>{const[a,b]=prog(who,k);
      return `<td><span class="cell ${b&&a===b?'on':b?'miss':'none'}" style="color:${b&&a===b?'var(--surface)':'var(--muted)'};font-size:11px">${b?a+'/'+b:'·'}</span></td>`}).join('')}</tr></tbody></table>
    <p class="small muted">초록 ✓ 한 일 · 빈 칸 안 한 일 · · 그날 없던 일</p>
-   ${isParent()||isTablet()?`<button class="btn ghost" data-act="rsend">가족방에 이번 주 요약 보내기</button>`:''}`
+   ${isParent()||isTablet()?`<button class="btn ghost" data-act="rsend">가족방에 이번 주 요약 보내기</button>`:''}
+   ${isParent()?`<label class="check" style="gap:10px"><input type="checkbox" id="wr-auto" ${S.settings.weeklyReport===false?'':'checked'} data-act="wrauto">일요일 밤 8시에 가족방으로 자동 보내기</label>`:''}`
   :'<p class="muted">이 주에는 할 일이 없었어요.</p>'}</div>`}
 
 function monthReport(){const who=ui.rwho,[y,mo]=ui.rmon||[now.getFullYear(),now.getMonth()];
@@ -904,7 +907,7 @@ const QUICK_KID=['사랑해요 😍','안녕히 주무세요 🌙','보고 싶�
 const QUICK_PARENT=['사랑해 ❤️','알았어 👍','곧 갈게 🚗','잘했어 👏','전화할게 📞','밥 먹자 🍚'];
 const sender=()=>isTablet()?'eun':ui.me;
 const canType=()=>sender()!=='yeon';
-const nameOf=id=>by(id)?by(id).name:'';
+const nameOf=id=>id==='report'?'주간 기록':by(id)?by(id).name:'';
 const readKey=()=>ui.me;
 const unread=()=>{if(!ui.me)return 0;const r=S.reads[readKey()]||0,me=sender();return MSG.filter(m=>m.ts>r&&m.from!==me).length};
 function hm(ts){const d=new Date(ts),h=d.getHours();return(h<12?'오전 ':'오후 ')+((h%12)||12)+':'+pad(d.getMinutes())}
@@ -1109,6 +1112,7 @@ app.addEventListener('click',e=>{
  else if(a==='wk'){const k=fromDn(dn(ui.wk||monStart(today))+(+b.dataset.n)*7);if(dn(k)<=dn(monStart(today)))ui.wk=k}
  else if(a==='mn'){const[y,mo]=ui.rmon||[now.getFullYear(),now.getMonth()],d2=new Date(y,mo+(+b.dataset.n),1);
   if(d2<=now)ui.rmon=[d2.getFullYear(),d2.getMonth()]}
+ else if(a==='wrauto'&&isParent()){upd({'settings.weeklyReport':S.settings.weeklyReport===false});return}
  else if(a==='rsend'){sendMsg(weekText(),false);ui.tab='chat';ui.scrollEnd=true}
  else if(a==='tgo'){if(b.dataset.d<=today){ui.td=b.dataset.d;ui.noteAsk=null;ui.linkAsk=null}}
  else if(a==='skipev'){const ev=S.events.find(x=>x.id===id);if(ev&&ev.rep&&canEv())upd({['events.'+id+'.skip']:arrayUnion(b.dataset.d)})}
@@ -1196,7 +1200,7 @@ function listenMsgs(){
  const q=msgFallback?fsQuery(MSGS,fsLimit(300)):fsQuery(MSGS,fsOrderBy('ts','desc'),fsLimit(100));
  unsubM=onSnapshot(q,snap=>{
   MSG=snap.docs.map(d=>{const x=d.data({serverTimestamps:'estimate'})||{};const t=x.ts&&x.ts.toMillis?x.ts.toMillis():Date.now();
-   return{id:d.id,from:x.from,text:String(x.text||''),quick:!!x.quick,reply:x.reply||null,ts:t}}).filter(m=>by(m.from));
+   return{id:d.id,from:x.from,text:String(x.text||''),quick:!!x.quick,reply:x.reply||null,ts:t}}).filter(m=>by(m.from)||m.from==='report');
   MSG=msgFallback?MSG.sort((a,b)=>a.ts-b.ts):MSG.reverse();
   chatErr='';
   const ids=new Set(MSG.map(m=>m.id));
