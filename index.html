@@ -256,6 +256,36 @@ a.link:hover{border-color:var(--accent)}
 .tmnote{background:var(--sunk);border-radius:16px;padding:12px 16px;max-width:520px}
 .timed{display:block;font-size:13px;color:var(--muted);padding:2px 0 0 42px}
 .timed b{color:var(--ok);font-weight:700}
+.rtabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);border-radius:999px;padding:5px}
+.rtabs button{border-radius:999px;padding:8px 4px;font-family:var(--display);font-size:16px;color:var(--muted)}
+.rtabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.gridw{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;font-variant-numeric:tabular-nums}
+.gridw col.rname{width:38%}
+.gridw th{font-weight:500;font-size:12px;color:var(--muted);padding:0}
+.gridw thead th span{display:block;font-size:11px}
+.gridw thead th.now{color:var(--accent);font-weight:700}
+.gridw tbody th{text-align:left;font-weight:400;font-family:var(--display);font-size:16px;color:var(--ink);padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell{width:100%;aspect-ratio:1;max-height:34px;border-radius:9px;display:grid;place-items:center;font-size:14px;background:var(--bg);color:transparent}
+.cell.on{background:var(--ok);color:var(--surface)}
+.cell.miss{box-shadow:inset 0 0 0 2px var(--line)}
+.cell.none{background:transparent;color:var(--muted)}
+.cell.today{outline:2px solid var(--accent);outline-offset:1px}
+.rsum{display:flex;flex-wrap:wrap;gap:8px}
+.rsum .stat{flex:1 1 110px;text-align:center}
+.rsum .stat b{font-size:26px;display:block}
+.mcal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.mcal .wd{font-size:11px;color:var(--muted)}
+.mday{aspect-ratio:1;border-radius:10px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.mday.today{outline:2px solid var(--accent)}
+.mday i{display:block;width:60%;height:5px;border-radius:999px;background:var(--line)}
+.mday i.p{background:linear-gradient(90deg,var(--ok) var(--p),var(--line) var(--p))}
+.mday.full{background:var(--ok);color:var(--surface)}
+.mday.full i{display:none}
+.rrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border-radius:14px;padding:8px 12px}
+.rrow .t{flex:1 1 130px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--display);font-size:17px}
+.rbar{flex:1 1 80px;height:10px;border-radius:999px;background:var(--star-bg);overflow:hidden;min-width:60px}
+.rbar i{display:block;height:100%;background:var(--ok)}
+@container (max-width:460px){.gridw tbody th{font-size:14px}.cell{max-height:28px;font-size:12px}.gridw col.rname{width:34%}}
 .soon{border:3px dashed var(--line);background:transparent;text-align:center;padding:36px 20px}
 
 .faces{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
@@ -322,7 +352,7 @@ function seedDoc(){const t={},add=(who,title)=>{t[newId('t')]={who,t:title,daily
 let S=EMPTY(),ready=false,syncErr='';
 function upd(o){if(!ready)return;updateDoc(REF,o).catch(err=>{syncErr='저장하지 못했어요 ('+(err.code||err.message)+'). 인터넷 연결을 확인해 주세요.';render()})}
 
-const ui={view:'loading',delR:null,msg2:'',timer:null,away:0,awayAt:0,linkAsk:null,noteAsk:null,scAsk:false,menu:null,delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
+const ui={view:'loading',delR:null,msg2:'',rview:'day',rwho:'eun',wk:null,rmon:null,timer:null,away:0,awayAt:0,linkAsk:null,noteAsk:null,scAsk:false,menu:null,delAsk:null,giveAsk:null,wxRes:null,wxMsg:'',startChat:START_CHAT,pushMsg:'',tsend:'eun',replyTo:null,pinMsg:'',pinNew:false,loginErr:'',tab:'home',me:null,pend:null,pin:'',ym:[now.getFullYear(),now.getMonth()],sel:today,hp:'eun',gm:'cm',pick:null,err:'',td:today};
 const isTablet=()=>ui.me==='tablet';
 const isParent=()=>!!ui.me&&!isTablet()&&by(ui.me).role==='parent';
 const canEv=()=>isParent()||isTablet();
@@ -468,7 +498,7 @@ const safeUrl=u=>{const v=String(u||'').trim();if(!v)return'';
  if(/^https?:\/\//i.test(v))return v;
  if(/^(javascript|data|vbscript|file):/i.test(v))return'';
  return /^[\w-]+(\.[\w-]+)+/.test(v)?'https://'+v:''};
-const APPVER='2026-11-18 h';
+const APPVER='2026-11-20 i';
 const MEALVIEW='https://schools.mealviewer.com/school/SettlesBridgeElementary';
 const SEED_LINKS=[{t:'은우 학교 홈페이지',url:'https://fcss-adfs.forsyth.k12.ga.us/adfs/ls/idpinitiatedsignon.aspx?SAMLRequest=fVLBbtswDP0VQ3dLtpd0nRAnyFoMC5BiQZPusMvAybJDxKY8kQ6yvx8ct2h76ZHkw3uPj1ysLl2bnH1kDFSqXGdqtVwwdG1v14Mc6dH%2FHTxLculaYnsdlGqIZAMwsiXoPFtxdr9%2B2NpCZ7aPQYILrUo296X67fKbAvK5c85BVde3s3wOKvn5IljoTCUb5sFviAVISlVkxU2afUmz%2FJAVdjaz%2BVx%2FLma%2FVLJ7pv6KVCE1H%2Fv4M4HYfj8cdunux%2F6gknvPggRylT6K9GyNqR1zClXNug6R%2F8lRn%2FJCN6AHNmPbtGyw6pFQEMRXjA0F0sD9RSVrZh9HvrtAPHQ%2B7n08o%2FNPj9tXBfEEJGkHBI3vPEnKE0q7FphbpJPGYNrQIJnzJ50ZGOToSdCB%2BJULlS%2B%2FTd7UdBx7jSy%2BucrHYcCLTbUcYR26GDjUYscF7d3oYot0Wpg35Mupev8Hy%2F8%3D&RelayState=e30&client-request-id=3f3eaf91-a29c-4f27-235b-0080010800e8&pullStatus=0'},
  {t:'은우 학교 급식표',url:MEALVIEW}];
@@ -613,12 +643,91 @@ document.addEventListener('visibilitychange',()=>{
  else if(ui.awayAt){ui.away=nowS()-ui.awayAt;ui.awayAt=0;render(true)}});
 
 /* ---------- 할 일 ---------- */
+/* ---------- 주간·월간 리포트 ---------- */
+const monStart=d=>{const w=new Date(d+'T00:00').getDay();return fromDn(dn(d)-(w===0?6:w-1))};
+function taskStat(who,id,from,to){let plan=0,done=0,sec=0;
+ for(let x=dn(from);x<=dn(to);x++){const k=fromDn(x);
+  if(!tasksOn(who,k).some(t=>t.id===id))continue;plan++;
+  const t=S.tasks.find(y=>y.id===id);if(t&&isDone(t,k))done++;
+  const z=tm(id,k);if(z)sec+=z.sec||0}
+ return{plan,done,sec}}
+function rangeStat(who,from,to){let plan=0,done=0,sec=0,days=0,fullDays=0;
+ for(let x=dn(from);x<=dn(to);x++){const k=fromDn(x),l=tasksOn(who,k);if(!l.length)continue;
+  days++;const a=l.filter(t=>isDone(t,k)).length;plan+=l.length;done+=a;if(a===l.length)fullDays++;
+  l.forEach(t=>{const z=tm(t.id,k);if(z)sec+=z.sec||0})}
+ return{plan,done,sec,days,fullDays}}
+const whoPick=()=>`<div class="row">${M.map(m=>`<button class="pill ${ui.rwho===m.id?'on':''}" data-act="rwho" data-id="${m.id}">${av(m.id,'sm')}${m.name}</button>`).join('')}</div>`;
+const rtabs=()=>`<div class="rtabs" role="tablist">${[['day','하루'],['week','주간'],['month','월간']].map(([k,n])=>
+ `<button role="tab" aria-selected="${ui.rview===k}" data-act="rview" data-v="${k}">${n}</button>`).join('')}</div>`;
+
+function weekReport(){const who=ui.rwho,start=ui.wk||monStart(today),days=[0,1,2,3,4,5,6].map(i=>fromDn(dn(start)+i));
+ const end=days[6],st=rangeStat(who,start,end);
+ // 이번 주에 한 번이라도 예정된 할 일
+ const rows=S.tasks.filter(t=>t.who===who&&days.some(k=>tasksOn(who,k).some(x=>x.id===t.id)));
+ const pct=st.plan?Math.round(st.done/st.plan*100):0;
+ return `${whoPick()}
+ <div class="card stack"><div class="row"><button class="btn ghost sm" data-act="wk" data-n="-1" aria-label="지난 주">‹</button>
+   <h3 class="grow" style="text-align:center">${+start.slice(5,7)}월 ${+start.slice(8)}일 ~ ${+end.slice(5,7)}월 ${+end.slice(8)}일</h3>
+   <button class="btn ghost sm" data-act="wk" data-n="1" aria-label="다음 주" ${dn(end)>=dn(today)?'disabled style="opacity:.4"':''}>›</button></div>
+  <div class="rsum"><div class="stat"><span class="small muted">한 일</span><b>${st.done}<span style="font-size:15px">/${st.plan}</span></b></div>
+   <div class="stat"><span class="small muted">달성률</span><b>${pct}%</b></div>
+   <div class="stat"><span class="small muted">다 한 날</span><b>${st.fullDays}<span style="font-size:15px">일</span></b></div>
+   ${st.sec?`<div class="stat"><span class="small muted">공부</span><b style="font-size:20px">${hm2(st.sec)}</b></div>`:''}</div>
+  ${rows.length?`<table class="gridw"><colgroup><col class="rname"><col span="7"></colgroup>
+   <thead><tr><th></th>${days.map(k=>`<th class="${k===today?'now':''}">${WD[dow(k)]}<span>${+k.slice(8)}</span></th>`).join('')}</tr></thead>
+   <tbody>${rows.map(t=>`<tr><th scope="row" title="${esc(t.t)}">${esc(t.t)}</th>${days.map(k=>{
+     const planned=tasksOn(who,k).some(x=>x.id===t.id);if(!planned)return `<td><span class="cell none">·</span></td>`;
+     const on=isDone(t,k);return `<td><span class="cell ${on?'on':'miss'} ${k===today?'today':''}">✓</span></td>`}).join('')}</tr>`).join('')}
+   <tr><th scope="row" class="small muted" style="font-family:var(--body)">하루 합계</th>${days.map(k=>{const[a,b]=prog(who,k);
+     return `<td><span class="cell ${b&&a===b?'on':b?'miss':'none'}" style="color:${b&&a===b?'var(--surface)':'var(--muted)'};font-size:11px">${b?a+'/'+b:'·'}</span></td>`}).join('')}</tr></tbody></table>
+   <p class="small muted">초록 ✓ 한 일 · 빈 칸 안 한 일 · · 그날 없던 일</p>
+   ${isParent()||isTablet()?`<button class="btn ghost" data-act="rsend">가족방에 이번 주 요약 보내기</button>`:''}`
+  :'<p class="muted">이 주에는 할 일이 없었어요.</p>'}</div>`}
+
+function monthReport(){const who=ui.rwho,[y,mo]=ui.rmon||[now.getFullYear(),now.getMonth()];
+ const first=y+'-'+pad(mo+1)+'-01',dim=new Date(y,mo+1,0).getDate(),last=y+'-'+pad(mo+1)+'-'+pad(dim);
+ const st=rangeStat(who,first,last);
+ const rows=S.tasks.filter(t=>t.who===who).map(t=>Object.assign({t},taskStat(who,t.id,first,last))).filter(r=>r.plan>0)
+  .sort((a,b)=>(b.done/b.plan)-(a.done/a.plan)||b.plan-a.plan);
+ let cells='';for(let i=0;i<(new Date(y,mo,1).getDay()+6)%7;i++)cells+='<span></span>';
+ for(let d2=1;d2<=dim;d2++){const k=y+'-'+pad(mo+1)+'-'+pad(d2),fut=k>today,[a,b]=fut?[0,0]:prog(who,k),p=b?Math.round(a/b*100):0;
+  cells+=`<div class="mday ${b&&a===b?'full':''} ${k===today?'today':''}" style="${fut?'opacity:.45':''}" title="${k}${fut?'':' '+a+'/'+b}">${d2}
+   ${fut?'':b?`<i class="p" style="--p:${p}%"></i>`:'<i></i>'}</div>`}
+ const next=new Date(y,mo+1,1);
+ return `${whoPick()}
+ <div class="card stack"><div class="row"><button class="btn ghost sm" data-act="mn" data-n="-1" aria-label="지난 달">‹</button>
+   <h3 class="grow" style="text-align:center">${y}년 ${mo+1}월</h3>
+   <button class="btn ghost sm" data-act="mn" data-n="1" aria-label="다음 달" ${next>now?'disabled style="opacity:.4"':''}>›</button></div>
+  <div class="rsum"><div class="stat"><span class="small muted">모은 별</span><b>⭐ ${st.done}</b></div>
+   <div class="stat"><span class="small muted">달성률</span><b>${st.plan?Math.round(st.done/st.plan*100):0}%</b></div>
+   <div class="stat"><span class="small muted">다 한 날</span><b>${st.fullDays}<span style="font-size:15px">일</span></b></div>
+   ${st.sec?`<div class="stat"><span class="small muted">공부</span><b style="font-size:20px">${hm2(st.sec)}</b></div>`:''}</div>
+  <div class="mcal">${['월','화','수','목','금','토','일'].map(w=>`<span class="wd">${w}</span>`).join('')}${cells}</div>
+  <p class="small muted">초록이 진할수록 그날 할 일을 많이 한 거예요.</p></div>
+ <div class="card stack"><h3>루틴별 기록</h3>
+  ${rows.map(r=>{const p=Math.round(r.done/r.plan*100);
+   return `<div class="rrow"><span class="t">${esc(r.t.t)}</span><span class="rbar"><i style="width:${p}%"></i></span>
+    <span class="chip">${r.done}/${r.plan}</span>${r.sec?`<span class="chip">⏱ ${hm2(r.sec)}</span>`:''}</div>`}).join('')
+   ||'<p class="muted">이 달에는 기록이 없어요.</p>'}</div>`}
+
+function weekText(){const who=ui.rwho,start=ui.wk||monStart(today),end=fromDn(dn(start)+6),st=rangeStat(who,start,end);
+ const rows=S.tasks.filter(t=>t.who===who).map(t=>Object.assign({t},taskStat(who,t.id,start,end))).filter(r=>r.plan>0)
+  .sort((a,b)=>(b.done/b.plan)-(a.done/a.plan));
+ const best=rows[0],worst=rows[rows.length-1];
+ return `📊 ${by(who).name} 이번 주 (${+start.slice(5,7)}/${+start.slice(8)}~${+end.slice(5,7)}/${+end.slice(8)})\n`+
+  `할 일 ${st.done}/${st.plan} (${st.plan?Math.round(st.done/st.plan*100):0}%) · 다 한 날 ${st.fullDays}일`+
+  (st.sec?`\n공부 ${hm2(st.sec)}`:'')+
+  (best?`\n잘한 것: ${best.t.t} ${best.done}/${best.plan}`:'')+
+  (worst&&worst!==best?`\n더 해볼 것: ${worst.t.t} ${worst.done}/${worst.plan}`:'')}
+
 function todoView(){
  const d=ui.td,isToday=d===today,ids=M.map(m=>m.id),order=isTablet()?ids:[ui.me].concat(ids.filter(i=>i!==ui.me));
  const week=id=>{let h='';for(let i=6;i>=0;i--){const k=fromDn(dn(d)-i),[a,b]=prog(id,k);
    h+=`<button class="${k===d?'cur':''}" data-act="tgo" data-d="${k}" aria-label="${nice(k)}요일 ${b}개 중 ${a}개 완료">${WD[new Date(k+'T00:00').getDay()]}<b class="${b&&a===b?'full':''}">${b?a+'/'+b:'-'}</b></button>`}
   return `<div class="week">${h}</div>`};
- return `<div class="card row"><button class="btn ghost sm" data-act="tday" data-n="-1" aria-label="전날">‹</button>
+ if(ui.rview!=='day')return `<div class="card">${rtabs()}</div>${ui.rview==='week'?weekReport():monthReport()}`;
+ return `<div class="card stack">${rtabs()}</div>
+ <div class="card row"><button class="btn ghost sm" data-act="tday" data-n="-1" aria-label="전날">‹</button>
    <h3 class="grow" style="text-align:center">${nice(d)}요일${isToday?' · 오늘':''}</h3>
    <button class="btn ghost sm" data-act="tday" data-n="1" aria-label="다음 날" ${isParent()?(d>=fromDn(dn(today)+14)?'disabled style="opacity:.4"':''):(isToday?'disabled style="opacity:.4"':'')}>›</button>
    ${isToday?'':'<button class="btn sm" data-act="tgo" data-d="'+today+'">오늘로</button>'}</div>
@@ -925,7 +1034,7 @@ function markRead(){if(!ready||ui.view!=='main'||ui.tab!=='chat'||!MSG.length)re
 const ME_KEY='hafamily-me';
 const remembered=()=>{try{const v=localStorage.getItem(ME_KEY);return v==='eun'||v==='yeon'?'tablet':['tablet','mom','dad'].includes(v)?v:null}catch(e){return null}};
 const remember=v=>{try{if(v)localStorage.setItem(ME_KEY,v);else localStorage.removeItem(ME_KEY)}catch(e){}};
-function enter(id){ui.td=today;ui.me=id;ui.tab=ui.startChat?'chat':'home';ui.startChat=false;ui.view='main';ui.pick=null;ui.hp=id==='tablet'?'eun':id;
+function enter(id){ui.rview='day';ui.rwho=id==='tablet'?'eun':by(id).role==='child'?id:'eun';ui.wk=null;ui.rmon=null;ui.td=today;ui.me=id;ui.tab=ui.startChat?'chat':'home';ui.startChat=false;ui.view='main';ui.pick=null;ui.hp=id==='tablet'?'eun':id;
  const kid=id==='tablet'||by(id).role==='child';remember(kid||ui.pinRemember?id:null);if(kid)lsSet('hafamily-kiddev','1')}
 async function hashPin(who,pin){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('hafamily:'+who+':'+pin));
  return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -995,6 +1104,12 @@ app.addEventListener('click',e=>{
  else if(a==='pickwho'&&isParent()){ui.pick=id}
  else if(a==='face'&&ui.pick&&(isParent()||ui.pick===ui.me)){upd({['faces.'+ui.pick]:b.dataset.f})}
  else if(a==='tday'){ui.delAsk=null;ui.noteAsk=null;ui.linkAsk=null;const k=fromDn(dn(ui.td)+(+b.dataset.n));if(k<=today||(isParent()&&k<=fromDn(dn(today)+14)))ui.td=k}
+ else if(a==='rview'){ui.rview=b.dataset.v;ui.noteAsk=null;ui.delAsk=null;if(!ui.wk)ui.wk=monStart(today)}
+ else if(a==='rwho'){ui.rwho=id}
+ else if(a==='wk'){const k=fromDn(dn(ui.wk||monStart(today))+(+b.dataset.n)*7);if(dn(k)<=dn(monStart(today)))ui.wk=k}
+ else if(a==='mn'){const[y,mo]=ui.rmon||[now.getFullYear(),now.getMonth()],d2=new Date(y,mo+(+b.dataset.n),1);
+  if(d2<=now)ui.rmon=[d2.getFullYear(),d2.getMonth()]}
+ else if(a==='rsend'){sendMsg(weekText(),false);ui.tab='chat';ui.scrollEnd=true}
  else if(a==='tgo'){if(b.dataset.d<=today){ui.td=b.dataset.d;ui.noteAsk=null;ui.linkAsk=null}}
  else if(a==='skipev'){const ev=S.events.find(x=>x.id===id);if(ev&&ev.rep&&canEv())upd({['events.'+id+'.skip']:arrayUnion(b.dataset.d)})}
  render();
